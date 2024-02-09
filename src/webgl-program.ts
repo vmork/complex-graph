@@ -1,6 +1,6 @@
 import * as utils from "./webgl-utils";
 
-type UniformType = "float" | "vec2" | "mat2" | "mat3" | "int";
+type UniformType = "float" | "vec2" | "mat2" | "mat3" | "int" | "bool";
 type UniformValue = number | number[];
 
 class Uniform {
@@ -140,6 +140,9 @@ class ProgramManager {
     getUniformValue(name: string) {
         return this.uniforms.get(name).value
     }
+    logUniforms() {
+        console.table(Array.from(this.uniforms.values()).map(u => [u.name, u.value]))
+    }
 
     private setUniformLocations() {
         for (let u of this.uniforms.values()) {
@@ -152,7 +155,10 @@ class ProgramManager {
         for (let u of this.uniforms.values()) {
             if     (u.type === "float") gl.uniform1f(u.loc, u.value);
             else if (u.type === "vec2") gl.uniform2fv(u.loc, u.value);
+            else if (u.type === "int")  gl.uniform1i(u.loc, u.value);
+            else if (u.type === "mat2") gl.uniformMatrix2fv(u.loc, false, u.value);
             else if (u.type === "mat3") gl.uniformMatrix3fv(u.loc, false, u.value);
+            else if (u.type === "bool") gl.uniform1i(u.loc, u.value); 
             else console.error("Unsupported uniform type: " + u.type);
         }
     }

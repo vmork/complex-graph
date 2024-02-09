@@ -4,6 +4,8 @@ import * as utils from "./webgl-utils";
 import { ProgramManager, Uniform, UniformType, UniformValue } from "./webgl-program";
 import { shaderError } from "./stores";
 
+type Settings = Map<string, {type: UniformType, value: any}>
+
 class Canvas {
     gl: WebGL2RenderingContext;
     c: HTMLCanvasElement;
@@ -15,23 +17,39 @@ class Canvas {
     mousePos: Point = {x: 0, y: 0};
     fvalAtMouse: Point = {x: 0, y: 0};
 
+    settings: Settings = new Map(Object.entries({
+        'showGrid': {type: 'bool', value: false},
+        'gridSpacing': {type: 'float', value: 1.0},
+        'showModContours': {type: 'bool', value: true},
+        'showPhaseContours': {type: 'bool', value: false},
+    }))
+
     constructor(canvas: HTMLCanvasElement, userFunctionSrc: string) {
         this.c = canvas;
         this.mousePos = {x: 0, y: 0};
         this.userFunctionSrc = userFunctionSrc;
     }
 
+    updateSetting(name: string, value: any, render: boolean=true) {
+        if (!this.settings.has(name)) throw new Error(`setting ${name} doesnt exist`);
+        this.settings.set(name, value);
+        this.mainProgram.setUniformValue(`u_${name}`, value);
+        console.log("setting", name, value)
+        if (render) this.render();
+    }
+    getSettingValue(name: string) {
+        if (!this.settings.has(name)) throw new Error(`setting ${name} doesnt exist`)
+        return this.settings.get(name).value
+    }
+
     addUniform(name: string, value: UniformValue=null, type: UniformType="float") {
         this.mainProgram.addUniform(new Uniform(name, type));
         this.compProgram.addUniform(new Uniform(name, type));
         this.setUniformValue(name, value);
-
-        console.table(Array.from(this.mainProgram.uniforms.values()).map(u => [u.name, u.value]))
     }
     deleteUniform(name: string, recompile=true) {
         this.mainProgram.deleteUniform(name);
         this.compProgram.deleteUniform(name);
-        console.table(Array.from(this.mainProgram.uniforms.values()).map(u => [u.name, u.value]))
     }
     setUniformValue(name: string, value: any) { 
         this.mainProgram.setUniformValue(name, value);
@@ -82,7 +100,11 @@ class Canvas {
 
         this.mainProgram.setUniformValue("u_worldMat", this.camera.getWorldMatrix());
         this.mainProgram.setUniformValue("u_mouse", [this.mousePos.x, this.mousePos.y]);
+        this.mainProgram.setUniformValue("u_resolution", [this.c.width, this.c.height]);
+        this.mainProgram.setUniformValue("u_scale", [this.camera.scale.x, this.camera.scale.y]);
         this.mainProgram.bindAllUniforms();
+
+        this.mainProgram.logUniforms();
 
         gl.viewport(0, 0, this.c.width, this.c.height);
         gl.clearColor(0.42, 0.42, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
@@ -110,8 +132,15 @@ class Canvas {
         let mainProgram = new ProgramManager(gl, [
             new Uniform("u_worldMat", "mat3"),
             new Uniform("u_mouse", "vec2"),
+            new Uniform("u_resolution", "vec2"),
+            new Uniform("u_scale", "vec2"),
+            new Uniform("u_mouse", "vec2"),
         ]);
+        this.settings.forEach((v, k) => {
+            mainProgram.addUniform(new Uniform(`u_${k}`, v.type, v.value))
+        })
         await mainProgram.compileFromUrls("shaders/vertex.glsl", "shaders/fragment.glsl", this.userFunctionSrc);
+        console.table(Array.from(mainProgram.uniforms.values()).map(u => [u.name, u.value]))
 
         let compProgram = new ProgramManager(gl, [
             new Uniform("u_point", "vec2"),
@@ -152,4 +181,4 @@ class Canvas {
     }
 }
 
-export { Canvas }
+export { Canvas, type Settings }

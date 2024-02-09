@@ -14,29 +14,40 @@ out vec4 outColor;
 
 //#UFUNC
 
-const float modRepeat = 2.0; const float modStrength = 0.2;
-const float phaseRepeat = 8.0; const float phaseStrength = 0.1;
+const float modRepeat = 1.0;    const float modStrength = 0.08;
+const float phaseRepeat = 10.0; const float phaseStrength = 0.05;
+const vec3 gridColor = vec3(0.2);
+
+float grid(vec2 z) {
+    float pix = 1.5 * u_scale.y / u_resolution.y; // pixel size
+    float gs = u_gridSpacing * exp(-ceil(-log(u_scale.y))); // grid spacing
+    float gw = 0.5*pix; // line width
+
+    vec2 p = abs(mod(z + gw/2.0 + pix, gs) - pix);
+    float g = min(p.x, p.y) - gw;
+
+    return smoothstep(pix, 0.0, g);
+}
 
 vec3 gradient(float t, vec3 a, vec3 b, vec3 c, vec3 d) {
     return a + b*cos(TAU*(c*t+d));
 }
 
-vec3 color(vec2 z) {
+vec3 domainColor(vec2 z) {
     float t = Arg(z) / TAU + 0.5; // 0-1 
     vec3 c = gradient(t, vec3(0.4), vec3(0.5), vec3(1.0, 1.0, 0.75), vec3(0.8, 0.9, 0.3));
     
-    float modContour = pow(fract(modRepeat*log(Abs(z))), modStrength);
-    float phaseContour = pow(fract(phaseRepeat*t), phaseStrength);
+    float modContour = u_showModContours ? pow(fract(modRepeat*log(Abs(z))), modStrength) : 1.0;
+    float phaseContour = u_showPhaseContours ? pow(fract(phaseRepeat*t), phaseStrength) : 1.0;
+
     return c * modContour * phaseContour;
 }
 
 void main() {
     vec2 z = f(uv);
 
-    vec3 col = color(z);
-
-    // float r = length(z - u_mouse);
-    // col *= (1.0 - smoothstep(1.0, 2.0, r));
+    vec3 col = domainColor(z);
+    if (u_showGrid) col = mix(col, gridColor, grid(z));
 
     outColor = vec4(col, 1.0);
 }

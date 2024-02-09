@@ -1,20 +1,10 @@
-<script lang="ts" context="module"> 
-    export type SliderData = {
-        id: string,
-        name: string,
-        value: number,
-        min: number,
-        max: number,
-        step: number
-    }
-</script>
-
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
     import { fly, fade, scale } from "svelte/transition";
     import { makeAbsolute } from "../utils";
+    import type { UserSlider } from "../types";
 
-    export let sd: SliderData;
+    export let sd: UserSlider;
     
     let dispatch = createEventDispatcher();
     let showEditUI = false;
@@ -68,10 +58,12 @@
 </div>
 
 <style lang="scss">
-    // Remove the numeric input spinner
+    // Remove the default input[type="number"] spinner
     input[type="number"]::-webkit-outer-spin-button,
-    input[type="number"]::-webkit-inner-spin-button {
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type=number] {
         -webkit-appearance: none;
+        -moz-appearance: textfield;
         margin: 0;
     }
 
@@ -92,18 +84,18 @@
         gap: 10px;
         align-items: center;
     }
-    #slider {
+    input[type='range'] {
         -webkit-appearance: none;
         appearance: none;
         background: transparent;
         cursor: pointer;
         flex-grow: 1;
-        &::-webkit-slider-runnable-track {
+        &::-webkit-slider-runnable-track{
             background: var(--c-light-grey);
             height: 5px;
             border-radius: 3px;
         }
-        &::-webkit-slider-thumb  {
+        &::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
             width: 15px;

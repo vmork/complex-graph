@@ -14,7 +14,7 @@
             console.error($shaderError.message)
         }
     }
-    
+
     function handleKeyDown(e) {
         if (e.key === "Tab") {
             e.preventDefault();
@@ -56,11 +56,11 @@
         &::-webkit-scrollbar {
             display: none;
         }
-        &.error {
-            border: 1px solid var(--c-red);
-        }
         &:focus {
             border: 1px solid var(--c-primary);
+        }
+        &.error {
+            border: 1px solid var(--c-red);
         }
     }
     #error-div {
