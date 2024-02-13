@@ -1,7 +1,7 @@
 #version 300 es
 precision highp float;
 
-out vec4 outColor;
+out vec4 value;
 
 //#UNIFORMS
 
@@ -10,5 +10,5 @@ out vec4 outColor;
 //#UFUNC
 
 void main() {
-    outColor = vec4(f(u_point), 0.0, 1.0);
+    value = vec4(f(u_point), 0.0, 1.0);
 }
