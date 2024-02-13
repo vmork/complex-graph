@@ -1,12 +1,12 @@
 enum TT {
     // literals
-    IDENTIFIER, REAL_LITERAL, IMAGINARY_LITERAL,
+    IDENTIFIER, LITERAL_REAL, LITERAL_IMAG, TRUE, FALSE,
     // one char tokens
-    LPAREN, RPAREN, PLUS, MINUS, STAR, SLASH, COMMA, BANG, EQUAL, LESS, GREATER, HASH, COLON,
+    LPAREN, RPAREN, PLUS, MINUS, STAR, SLASH, COMMA, BANG, EQUAL, LESS, GREATER, HASH, COLON, CARET,
     // two-char tokens
-    BANG_EQUAL, EQUAL_EQUAL, COLON_EQUAL, LESS_EQUAL, GREATER_EQUAL, DOUBLE_BAR, DOUBLE_AMPERSAND, ARROW,
+    BANG_EQUAL, EQUAL_EQUAL, COLON_EQUAL, LESS_EQUAL, GREATER_EQUAL, DOUBLE_BAR, DOUBLE_AMPERSAND, ARROW, DOUBLE_DOT,
     // keywords
-    AND, OR, IF, ELSE, ELIF, RETURN, BREAK, FOR, WHILE, TRUE, FALSE,
+    AND, OR, IF, ELSE, ELIF, RETURN, BREAK, FOR, WHILE,
     // other
     NEWLINE, INDENT, DEDENT, EOF
 }
@@ -18,6 +18,7 @@ const lexemeToToken = new Map(Object.entries({
     '-': TT.MINUS,
     '*': TT.STAR,
     '/': TT.SLASH,
+    '^': TT.CARET,
     ',': TT.COMMA,
     '!': TT.BANG,
     ':': TT.COLON,
@@ -32,6 +33,7 @@ const lexemeToToken = new Map(Object.entries({
     '<=': TT.LESS_EQUAL,
     '>=': TT.GREATER_EQUAL,
     ':=': TT.COLON_EQUAL,
+    '..': TT.DOUBLE_DOT,
     '->': TT.ARROW,
     'and': TT.AND,
     'or': TT.OR,

@@ -3,8 +3,8 @@ import { SyntaxErr } from './error'
 
 const TABSIZE = 4;
 const EOF = "\0";
-const oneCharLexemes = new Set(['(', ')', '+', '*', '/', ',']); // can only be one char lexeme
-const twoCharLexemes = new Set(['-', ':', '!', '=', '<', '>']); // can be one or two char lexeme
+const oneCharLexemes = new Set(['(', ')', '+', '*', '/', ',', '^']); // can only be one char lexeme
+const twoCharLexemes = new Set(['-', ':', '!', '=', '<', '>', '.']); // can be one or two char lexeme
 
 function isDigit(c: string) {
     return /[0-9]/.test(c);
@@ -36,6 +36,10 @@ export class Scanner {
     peek() {
 		if (this.isAtEnd()) return EOF;
         return this.source[this.cur];
+    }
+    peek2() {
+        if (this.cur+1 >= this.source.length) return EOF;
+        return this.source[this.cur + 1];
     }
 
     advance() { // assumes were not at the end
@@ -78,11 +82,12 @@ export class Scanner {
 			if (lexemeToToken.has(c + c2)) {
 				this.cur += 1;
 				this.addToken(lexemeToToken.get(c + c2))
+                return;
 			}
-			else {
+			if (lexemeToToken.has(c)) {
 				this.addToken(lexemeToToken.get(c))
+                return;
 			}
-            return;
 		}
 		if (c === "#")  { this.scanComment(); return; }
 		if (c === "\n") { this.scanNewline(); return; }
@@ -119,7 +124,6 @@ export class Scanner {
         this.line += 1;
         const lastIndentLevel = this.indentLevels[this.indentLevels.length-1]
 		const newIndentLevel = this.getIndentLevel();
-        console.log(this.indentLevels)
 		if (this.peek() === "\n" || this.peek() === EOF) return; // ignore double newlines and indent before EOF
         this.addToken(TT.NEWLINE);
 
@@ -144,31 +148,23 @@ export class Scanner {
     }
     scanNumber() {
         this.consumeDigits();
-        if (this.peek() === ".") { this.cur += 1; this.consumeDigits(); }
+        if (this.peek() === "." && this.peek2() !== ".") { 
+            this.cur += 1; this.consumeDigits(); 
+        }
         
         const num = Number.parseFloat(this.currentLexeme())
         if (this.peek() === "i") {
-            this.addToken(TT.IMAGINARY_LITERAL, num); 
+            this.addToken(TT.LITERAL_IMAG, num); 
             this.cur += 1; 
         }
-        else this.addToken(TT.REAL_LITERAL, num)
+        else this.addToken(TT.LITERAL_REAL, num)
     }
 
     scanIdentifier() {
         while (isIdentifierChar(this.peek())) this.cur += 1;
         const name = this.currentLexeme();
-        if (name === "i") this.addToken(TT.IMAGINARY_LITERAL, 1); // imaginary number i
+        if (name === "i") this.addToken(TT.LITERAL_IMAG, 1); // imaginary number i
         else if (lexemeToToken.has(name)) this.addToken(lexemeToToken.get(name)) // keyword
         else this.addToken(TT.IDENTIFIER, name);
     }
 }
-
-// let source = 
-// `
-// a
-//   1112 
-//   xdq
-// b`
-// let scanner = new Scanner(source)
-// let tokens = scanner.scan()
-// console.log(tokens.map(t => t.toString()))
