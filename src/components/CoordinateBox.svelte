@@ -10,11 +10,8 @@
     }
 
     function formatNum(x: number): string {
-        if (Math.abs(x) < 0.001 || Math.abs(x) >= 1000) {
-            return x.toExponential(3);
-        } else {
-            return x.toFixed(3);
-        }
+        if (Math.abs(x) < 0.001 || Math.abs(x) >= 1000)  return x.toExponential(3);
+        else return x.toFixed(3);
     }
 </script>
 
@@ -27,11 +24,12 @@
     #coordinate-box {
         position: absolute;
         bottom: 0;
-        right: 0;
+        left: 0;
         padding: 10px;
-        background-color: rgba(255, 255, 255, 0.852);
+        background-color: var(--c-dark-grey);
+        color: var(--c-light-grey);
         border-radius: 5px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 0 2px var(--c-dark-grey);
 
         p {
             margin: 0;

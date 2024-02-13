@@ -1,5 +1,6 @@
 {
   "name": "svelte-template",
+  "type": "module",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -27,6 +28,7 @@
   },
   "dependencies": {
     "bootstrap-icons": "^1.11.3",
+    "dataclass": "^2.1.1",
     "sirv-cli": "^1.0.0",
     "split.js": "^1.6.5",
     "uuid": "^9.0.1"

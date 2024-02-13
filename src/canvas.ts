@@ -15,7 +15,6 @@ class Canvas {
     compProgram: ProgramManager;
     userFunctionSrc: string;
     mousePos: Point = {x: 0, y: 0};
-    fvalAtMouse: Point = {x: 0, y: 0};
 
     settings: Settings = new Map(Object.entries({
         'showGrid': {type: 'bool', value: false},
@@ -104,7 +103,7 @@ class Canvas {
         this.mainProgram.setUniformValue("u_scale", [this.camera.scale.x, this.camera.scale.y]);
         this.mainProgram.bindAllUniforms();
 
-        this.mainProgram.logUniforms();
+        // this.mainProgram.logUniforms();
 
         gl.viewport(0, 0, this.c.width, this.c.height);
         gl.clearColor(0.42, 0.42, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
@@ -115,6 +114,7 @@ class Canvas {
 
     async init(error: (s: string) => any) {
         const c = this.c;
+        utils.resizeCanvasToDisplaySize(c);
 
         const gl = c.getContext("webgl2");
         if (!gl) {
@@ -122,7 +122,7 @@ class Canvas {
         }
         this.gl = gl;
 
-        this.camera = new Camera(c, { setEventListeners: true });
+        this.camera = new Camera(c, { setEventListeners: false });
 
         let ext = gl.getExtension('EXT_color_buffer_float');
 		if (!ext) {
@@ -134,13 +134,12 @@ class Canvas {
             new Uniform("u_mouse", "vec2"),
             new Uniform("u_resolution", "vec2"),
             new Uniform("u_scale", "vec2"),
-            new Uniform("u_mouse", "vec2"),
         ]);
         this.settings.forEach((v, k) => {
             mainProgram.addUniform(new Uniform(`u_${k}`, v.type, v.value))
         })
         await mainProgram.compileFromUrls("shaders/vertex.glsl", "shaders/fragment.glsl", this.userFunctionSrc);
-        console.table(Array.from(mainProgram.uniforms.values()).map(u => [u.name, u.value]))
+        // console.table(Array.from(mainProgram.uniforms.values()).map(u => [u.name, u.value]))
 
         let compProgram = new ProgramManager(gl, [
             new Uniform("u_point", "vec2"),
@@ -161,23 +160,6 @@ class Canvas {
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 1, 1, 0, gl.RGBA, gl.FLOAT, null);
         gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
         this.compFbo = compFbo;
-        
-        c.addEventListener("mousemove", (e) => {
-            let [x, y] = this.camera.screenToWorld(e.clientX, e.clientY);
-            this.mousePos = {x, y};
-            this.fvalAtMouse = this.computeFval(this.mousePos);
-        }); 
-        // rerender after camera movements
-        c.addEventListener("camera", () => {
-			this.render();
-		})
-        // rerender after canvas resizing
-		let resizeObserver = new ResizeObserver(() => {
-			utils.resizeCanvasToDisplaySize(c);
-			this.camera.scale.x = this.camera.scale.y * this.camera.aspect();
-			this.render();
-		})
-		resizeObserver.observe(c);
     }
 }
 

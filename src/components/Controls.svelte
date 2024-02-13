@@ -1,4 +1,5 @@
 <script lang="ts">
+    // @ts-nocheck
     import type { Canvas } from "../canvas";
 
     export let canvas: Canvas;

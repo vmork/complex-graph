@@ -1,3 +1,5 @@
+import type { Point } from './types';
+
 type Options = {
     setEventListeners: boolean,
 }
@@ -22,20 +24,27 @@ export class Camera {
     reset() {
         this.origin = {x: 0, y: 0}; 
         this.scale = {x: this.aspect(), y: 1};
+        this.canvas.dispatchEvent(cameraEvent);
     }
 
-    screenToWorld(x: number, y: number) {
-        return [
-            this.origin.x + this.scale.x*(2*x/this.canvas.width-1),
-            this.origin.y + this.scale.y*(-2*y/this.canvas.height+1),
-        ]	
+    screenToWorld(x: number, y: number): Point {
+        return {
+            x: this.origin.x + this.scale.x*(2*x/this.canvas.width-1),
+            y: this.origin.y + this.scale.y*(-2*y/this.canvas.height+1),
+        }	
+    }
+    worldToScreen(x: number, y: number): Point {
+        return {
+            x: this.canvas.width/2 * (1 + (x-this.origin.x)/this.scale.x),
+            y: this.canvas.height/2 * (1 - (y-this.origin.y)/this.scale.y),
+        }
     }
 
     scaleAt(x: number, y: number, scaleBy: number) {
-        const [wx, wy] = this.screenToWorld(x, y);
+        const w = this.screenToWorld(x, y);
         const a = 1-scaleBy;
-        this.origin.x += a * (wx - this.origin.x);
-        this.origin.y += a * (wy - this.origin.y);	
+        this.origin.x += a * (w.x - this.origin.x);
+        this.origin.y += a * (w.y - this.origin.y);	
         this.scale.x *= scaleBy; this.scale.y *= scaleBy;
         this.canvas.dispatchEvent(cameraEvent);
     }

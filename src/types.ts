@@ -4,6 +4,8 @@ export type VariableID = string;
 
 export type VariableType = "slider" | "point";
 
+export type Color = string;
+
 export type UserSlider = {
     id: VariableID,
     type: "slider",
@@ -20,6 +22,7 @@ export type UserPoint = {
     name: string,
     x: number,
     y: number,
+    color: Color
 }
 
 export type UserVariable = UserSlider | UserPoint;
