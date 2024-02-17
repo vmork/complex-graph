@@ -1,7 +1,7 @@
 import { Token, TT } from './token';
 import { SyntaxErr } from './error';
 import * as ast from './ast-nodes';
-import { DataType as DT } from './types';
+import { DT } from './types';
 
 const EOF = new Token(TT.EOF, null, -1);
 
@@ -73,7 +73,7 @@ export class Parser {
         let stmt: ast.StmtNode;
         switch (this.peek().type) {
             case TT.IDENTIFIER: 
-                stmt = this.assignmentOrDeclaration(); break;
+                stmt = this.assignmentOrDeclarationOrFuncdef(); break;
             case TT.IF:
                 this.advance(); stmt = this.ifStmt(); break;
             case TT.FOR: 
@@ -91,36 +91,78 @@ export class Parser {
         }
         if ([ast.NT.If, ast.NT.For, ast.NT.While].includes(stmt.nodeType)) return stmt; // newline has already been handled
 
-        this.matchOrError([TT.NEWLINE, TT.EOF], "Unexcpected token " + this.peek().lexeme)
+        this.matchOrError([TT.NEWLINE, TT.SEMICOLON, TT.EOF], "Unexcpected token " + this.peek().lexeme)
 
         return stmt;
     }
+    
+    indentedBlock() {
+        this.matchOrError([TT.INDENT], "Excpected indent");
+        const block = this.stmtList();
+        this.matchOrError([TT.DEDENT, TT.EOF], "Expected dedent");
+        return block;
+    }
 
-    assignmentOrDeclaration() {
+    indentedBlockOrOnelineStmt(): ast.StmtList {
+        if (this.match([TT.NEWLINE])) return this.indentedBlock();
+        else return {nodeType: ast.NT.StmtList, statements: [this.statement()]} as ast.StmtList;
+    }
+
+    assignmentOrDeclarationOrFuncdef() {
         const name = this.advance().lexeme
+        if (this.match([TT.LPAREN])) return this.functionDefinition(name);
         const op = this.matchOrError([TT.EQUAL, TT.COLON_EQUAL], "Excpected assignment or declaration");
         const value = this.expression();
         if (op.type === TT.EQUAL) return {nodeType: ast.NT.Assignment, name: name, value: value} as ast.Assignment
         else return {nodeType: ast.NT.Declaration, name: name, value: value} as ast.Declaration
     }
 
-    indentedBlockOrStmt(): ast.StmtList {
-        if (this.match([TT.NEWLINE])) {
-            this.matchOrError([TT.INDENT], "Excpected indent");
-            const block = this.stmtList();
-            this.matchOrError([TT.DEDENT, TT.EOF], "Expected dedent");
-            return block;
-        }
-        else {
-            const block = {nodeType: ast.NT.StmtList, statements: [this.statement()]} as ast.StmtList;
-            return block;
-        }
+
+    identifier(): string {
+        this.matchOrError([TT.IDENTIFIER], "Expected identifier");
+        return this.prev().lexeme
     }
+
+    parameterList(): string[] {
+        if (this.match([TT.RPAREN])) return [];
+        let args = [this.identifier()];
+        while (!this.match([TT.RPAREN])) {
+            this.matchOrError([TT.COMMA], "Expected ',' or ')' in parameter list");
+            args.push(this.identifier());
+        }
+        return args;
+    }
+    argumentList(): ast.ExprNode[] {
+        if (this.match([TT.RPAREN])) return [];
+        let args = [this.expression()];
+        while (!this.match([TT.RPAREN])) {
+            this.matchOrError([TT.COMMA], "Expected ',' or ')' in argument list");
+            args.push(this.expression());
+        }
+        return args;
+    }
+
+    functionDefinition(name: string) {
+        let params = this.parameterList();
+        this.matchOrError([TT.COLON_EQUAL], "Expected ':=' in function definition"); 
+
+        let body: ast.StmtList;
+        if (this.match([TT.NEWLINE])) {
+            body = this.indentedBlock();
+        }
+        else { // f(x) := expr  ->  f(x) := { return expr }
+            let stmt = { nodeType: ast.NT.Return, value: this.expression() } as ast.Return
+            body = { nodeType: ast.NT.StmtList, statements: [stmt] } as ast.StmtList
+        }
+
+        return {nodeType: ast.NT.FuncDef, name, params, body} as ast.FunctionDefinition
+    }
+
 
     ifStmt() {
         const condition = this.expression();
-        this.matchOrError([TT.COLON], "Excpected ':' after if");
-        const mainBranch = this.indentedBlockOrStmt();
+        this.matchOrError([TT.COLON], "Excpected ':' in if-statement");
+        const mainBranch = this.indentedBlockOrOnelineStmt();
         let elseBranch: ast.StmtList;
 
         if (this.match([TT.ELIF])) {
@@ -128,22 +170,21 @@ export class Parser {
         }
         else if (this.match([TT.ELSE])) {
             this.matchOrError([TT.COLON], "Expected ':' after else")
-            elseBranch = this.indentedBlockOrStmt();
+            elseBranch = this.indentedBlockOrOnelineStmt();
         }
-        console.log("in ifStmt", this.peek().toString())
         return {nodeType: ast.NT.If, condition, mainBranch, elseBranch} as ast.If;
     }
 
     whileStmt() {
         const condition = this.expression();
         this.matchOrError([TT.COLON], "Excpected ':' in while-statement");
-        const body = this.indentedBlockOrStmt();
+        const body = this.indentedBlockOrOnelineStmt();
         return {nodeType: ast.NT.While, condition, body} as ast.While
     }
 
     forStmt() {
         const loopvar = this.matchOrError([TT.IDENTIFIER], "Expected identifier in for-statement").literal as string;
-        this.matchOrError([TT.EQUAL], "Expected '='");
+        this.matchOrError([TT.EQUAL], "Expected '=' in for-statement");
         const start = this.expression();
         this.matchOrError([TT.DOUBLE_DOT], "Expected range (start..end..[step])");
         const end = this.expression();
@@ -152,7 +193,7 @@ export class Parser {
             step = this.expression();
         }
         this.matchOrError([TT.COLON], "Excpected ':' in for-statement");
-        const body = this.indentedBlockOrStmt(); 
+        const body = this.indentedBlockOrOnelineStmt(); 
         return {nodeType: ast.NT.For, loopvar, start, end, step, body} as ast.For
     }
 
@@ -200,37 +241,46 @@ export class Parser {
             const expr = this.unary();
             return {nodeType: ast.NT.Unary, op, expr} as ast.Unary
         }
-        return this.power();
-    }
-    power() {
-        return this._binary([TT.CARET], () => this.implicitMultiplication());
+        return this.implicitMultiplication();
     }
 
     implicitMultiplication() { // NUMBER? (IDENT|grouping)*
-        if (this.match([TT.LITERAL_IMAG, TT.LITERAL_REAL, TT.LPAREN], false)) {
-            let left = this.primary() as ast.ExprNode;
+        if (this.match([TT.LITERAL_IMAG, TT.LITERAL_REAL, TT.LPAREN, TT.IDENTIFIER], false)) {
+            let left = this.power() as ast.ExprNode;
             while (this.match([TT.LPAREN, TT.IDENTIFIER], false)) {
-                let right = this.primary();
+                let right = this.power();
                 left = {nodeType: ast.NT.Binary, op: new Token(TT.STAR, "*", -1), left, right} as ast.Binary
             }
             return left;
         }
-        return this.primary();
+        return this.power();
     }
 
-    grouping() { // left paren assumed to already have been matched
+    power() {
+        return this._binary([TT.CARET], () => this.functionCall());
+    }
+
+    functionCall() {
+        const callee = this.primary();
+        if (callee.nodeType === ast.NT.Variable && this.match([TT.LPAREN])) {
+            const args = this.argumentList();
+            return {nodeType: ast.NT.FuncCall, callee, args} as ast.FunctionCall
+        }
+        return callee;
+    }
+
+    _grouping() {
         const expr = this.expression();
         this.matchOrError([TT.RPAREN], "Unmatched opening parenthesis");
         return {nodeType: ast.NT.Grouping, expr} as ast.Grouping
     }
-
     primary() {
         if (this.match([TT.TRUE])) return {nodeType: ast.NT.Literal, value: true, dataType: DT.Bool} as ast.Literal
         if (this.match([TT.FALSE])) return {nodeType: ast.NT.Literal, value: false, dataType: DT.Bool} as ast.Literal
         if (this.match([TT.LITERAL_REAL])) return {nodeType: ast.NT.Literal, value: this.prev().literal, dataType: DT.Real} as ast.Literal
         if (this.match([TT.LITERAL_IMAG])) return {nodeType: ast.NT.Literal, value: this.prev().literal, dataType: DT.Imag} as ast.Literal
         if (this.match([TT.IDENTIFIER])) return {nodeType: ast.NT.Variable, name: this.prev().literal} as ast.Variable
-        if (this.match([TT.LPAREN])) return this.grouping();
+        if (this.match([TT.LPAREN])) return this._grouping();
         this.error("Expected expression")
     }
 }

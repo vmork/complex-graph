@@ -21,7 +21,7 @@ const vec3 gridColor = vec3(0.2);
 float grid(vec2 z) {
     float pix = 1.5 * u_scale.y / u_resolution.y; // pixel size
     float gs = u_gridSpacing * exp(-ceil(-log(u_scale.y))); // grid spacing
-    float gw = 0.5*pix; // line width
+    float gw = 1.0*pix; // line width
 
     vec2 p = abs(mod(z + gw/2.0 + pix, gs) - pix);
     float g = min(p.x, p.y) - gw;

@@ -1,12 +1,41 @@
 ## Notes 
-- add & sub are special cases out of (add,sub,mul,div) since
-    - a + bi + 1 = (a+1) + bi, not (a+1) + (b+1)i
-    - so normal glsl addition does the wrong thing when one operand is real and other is complex
-    - one approach is to convert every real x to vec2(x,0)
-    - but should really keep track of all types and switch behavior depending on operand types, since we kind of need to do that anyway probably
-- Arguments in function definitions are assumed to be complex (?)
+- How to determine types of parameters in function definition:
+    - Assume all types are either float or vec2 (allowing ie higher order functions is just too complicated, and bool arguments are sort of useless).
+    - Write all possible overloads (2^{number of params}), limit number of params to like 5
+
 - glsl doesnt allow nested function declarations, so easiest not to do so either
 - If a function body has branching in it, require that all branches return the same type and raise error if not
+- both e and i are reserved identifiers
+- Builtin functions: re, im, conj, abs, arg, exp (e^), inv (^-1), pow (^), sqrt (^0.5), sin, cos, tan, arccos, arcsin, arctan
+- Information related to builtin function:
+    - lslg name
+    - implementation name
+    - return type
+    - input signatures (most funcs have multiple signatures, ie abs, sqrt, pow, all trig funcs)
+
+- Resolving function calls:
+    - if name is in list of builtin functions:
+        - Check that type signatures match, raise error if not
+        - Change name to iplementation name
+        - Take care of overloading by writing overloads in complex.glsl
+        - Set node type to return type
+    - if name is a defined function in scope
+        - Check that type signatures match (can only be cmplx* for now)
+        - Set node type to return type
+    - else: error
+
+- There should be a map `env` of (varname -> type) that is updated for every declaration.
+  A declaration inside a function body only updates the local scoped env, which is init'd to copy of global env.
+  We dont allow nested function definitions so should be simple.
+  Need to update with sliders and points from gui at init time.
+
+- Resolving assignment
+    - if name hasnt been declared: error
+    - if name is reserved: error
+    - if type of rhs doesnt match env.get(name): error
+- Resolving declaration
+    - if already declared or reserved: error
+    - else: env.set(name, type of rhs)
 
 ## Examples
 

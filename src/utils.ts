@@ -11,3 +11,7 @@ export function roundToDigits(x: number, digits: number) {
 export function randomColorRGB() {
     return `#${Math.floor(Math.random()*16777215).toString(16)}`;
 }
+
+export function addLineNums(src: string) {
+    return src.split("\n").map((l, i) => `${i+1}: ${l}`).join("\n")
+}

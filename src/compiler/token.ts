@@ -2,7 +2,7 @@ enum TT {
     // literals
     IDENTIFIER, LITERAL_REAL, LITERAL_IMAG, TRUE, FALSE,
     // one char tokens
-    LPAREN, RPAREN, PLUS, MINUS, STAR, SLASH, COMMA, BANG, EQUAL, LESS, GREATER, HASH, COLON, CARET,
+    LPAREN, RPAREN, PLUS, MINUS, STAR, SLASH, COMMA, BANG, EQUAL, LESS, GREATER, HASH, COLON, CARET, SEMICOLON,
     // two-char tokens
     BANG_EQUAL, EQUAL_EQUAL, COLON_EQUAL, LESS_EQUAL, GREATER_EQUAL, DOUBLE_BAR, DOUBLE_AMPERSAND, ARROW, DOUBLE_DOT,
     // keywords
@@ -19,6 +19,7 @@ const lexemeToToken = new Map(Object.entries({
     '*': TT.STAR,
     '/': TT.SLASH,
     '^': TT.CARET,
+    ';': TT.SEMICOLON,
     ',': TT.COMMA,
     '!': TT.BANG,
     ':': TT.COLON,

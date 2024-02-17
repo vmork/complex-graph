@@ -35,7 +35,7 @@
 
 		split = Split(["#sidebar-div", "#canvas-div"], {
 			sizes: lastSplitSizes,
-			minSize: [250, 250],
+			minSize: [350, 250],
 			gutterSize: 5,
 			gutterAlign: "start",
 			onDragEnd: () => {

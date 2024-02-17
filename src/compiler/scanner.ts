@@ -3,7 +3,7 @@ import { SyntaxErr } from './error'
 
 const TABSIZE = 4;
 const EOF = "\0";
-const oneCharLexemes = new Set(['(', ')', '+', '*', '/', ',', '^']); // can only be one char lexeme
+const oneCharLexemes = new Set(['(', ')', '+', '*', '/', ',', '^', ';']); // can only be one char lexeme
 const twoCharLexemes = new Set(['-', ':', '!', '=', '<', '>', '.']); // can be one or two char lexeme
 
 function isDigit(c: string) {

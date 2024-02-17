@@ -19,7 +19,7 @@
 
     $uvars = [
         {id: uuidv4(), type: "slider", name: "x", value: 0, min: -10, max: 10, step: 0.01},
-        {id: uuidv4(), type: "point", name: "point", x: 0, y: 0, color: randomColorRGB()},
+        {id: uuidv4(), type: "point", name: "p", x: 0, y: 0, color: randomColorRGB()},
     ];
 
     $uvars.forEach(v => {

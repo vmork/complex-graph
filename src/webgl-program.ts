@@ -1,3 +1,4 @@
+import { addLineNums } from "./utils";
 import * as utils from "./webgl-utils";
 
 type UniformType = "float" | "vec2" | "mat2" | "mat3" | "int" | "bool";
@@ -83,6 +84,7 @@ class ProgramManager {
         let fragSrc = await utils.getShaderText(fragUrl);  
         fragSrc = await insertIncludes(fragSrc)
         this.vertSrcRaw = vertSrc; this.fragSrcRaw = fragSrc;
+
         return this.compile(vertSrc, fragSrc, userFunction);
     }
 
@@ -91,6 +93,8 @@ class ProgramManager {
 
         fragSrc = insertUserFunction(fragSrc, userFunction);
         fragSrc = insertUniforms(fragSrc, this.uniforms.values());
+
+        // console.log(addLineNums(fragSrc));
 
         this.isCompiled = true;
         const vertShader = this.compileShader(gl.VERTEX_SHADER, vertSrc, this.vertUrl);

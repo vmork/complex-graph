@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+      "target": "ES2017",                                  /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
+      "module": "ES2022",
+      "moduleResolution": "node",                                /* Specify what module code is generated. */
+      "esModuleInterop": true,                             /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
+      "skipLibCheck": true,                                 /* Skip type checking all .d.ts files. */
+      // "allowSyntheticDefaultImports": true,
+      "sourceMap": true,
+      "rootDir": ".",
+      "outDir": "./dist"
+    }
+}

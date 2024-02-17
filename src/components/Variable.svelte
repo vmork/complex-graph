@@ -1,7 +1,9 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
+    import { onMount } from "svelte";
     import { scale } from "svelte/transition";
     import type { UserVariable, UserSlider } from "../types";
+    import ResizableInput from "./ResizableInput.svelte";
 
     export let data: UserVariable;
     
@@ -9,14 +11,21 @@
     let showEditUI = false;
     let prevName = data.name;
 
-    if (data.type === "point") console.log(data.color)
-
-    function onNameChange(e: Event) {
-        dispatch("nameChange", {prevName: prevName, data: data});
-        prevName = data.name;
+    function resetPoint() {
+        if (data.type === "point") {
+            data.x = 0; data.y = 0;
+        }
+        onValueChange();
+        showEditUI = false;
     }
 
-    function onValueChange(e: Event) {
+    function onNameChange() {
+        dispatch("nameChange", {prevName: prevName, data: data});
+        prevName = data.name;
+
+    }
+
+    function onValueChange() {
         dispatch("valueChange", data);
         updateMinMax();
     }
@@ -39,16 +48,16 @@
                 style:background-color={data.color}>
         {/if}
 
-        <input id="name-input" type="text" size={Math.max(data.name.length-3, 1)}
-            bind:value={data.name} on:input={onNameChange}/> 
-        <span class="eq-sign">=</span>
+        <ResizableInput type="text" bind:value={data.name} on:input={onNameChange}/>
+
+        <span class="non-clickable">=</span>
 
         {#if data.type === "slider"}
             <input id="value-input" type="number" min={data.min} max={data.max} step={data.step} 
                 bind:value={data.value} on:input={onValueChange}/>
         {:else if data.type === "point"}
-            a: <input id="value-input" type="number" bind:value={data.x} on:input={onValueChange}/>
-            b: <input id="value-input" type="number" bind:value={data.y} on:input={onValueChange}/>
+            <ResizableInput type="number" bind:value={data.x} on:input={onValueChange}/> <span class="non-clickable">+</span>
+            <ResizableInput type="number" bind:value={data.y} on:input={onValueChange}/> <span class="non-clickable letter-i">i</span>
         {/if}
 
         <button id="settings-btn" on:click={() => showEditUI = !showEditUI}>
@@ -64,6 +73,8 @@
                 <span>Min: </span><input type="number"  bind:value={data.min}/>
                 <span>Max: </span><input type="number"  bind:value={data.max}/>
                 <span>Step: </span><input type="number" bind:value={data.step}/>
+            {:else}
+                <button id="reset-point-btn" on:click={resetPoint}>Reset</button>
             {/if}
         </div>
     {:else}
@@ -80,9 +91,9 @@
 
 <style lang="scss">
     // Remove the default input[type="number"] spinner
-    input[type="number"]::-webkit-outer-spin-button,
+    :global(input[type="number"]::-webkit-outer-spin-button,
     input[type="number"]::-webkit-inner-spin-button,
-    input[type=number] {
+    input[type=number]) {
         -webkit-appearance: none;
         -moz-appearance: textfield;
         margin: 0;
@@ -131,17 +142,23 @@
             transition: background-color 0.2s, transform 0.2s;
         }
     }
-    .eq-sign {
+    .non-clickable {
         display: inline-block;
         font-size: 1.5em;
-        color: var(--c-light-grey);
-        translate: -10px 0px;
+        color: #eeeeeec8;
+        translate: -5px 1px;
+        &.letter-i {
+            font-size: 1.4em;
+            font-family: "TeX Gyre Pagella";
+            translate: -10px 1px;
+        }
     }
     input {
         outline: none;
     }
     #name-input {
-        translate: 0 -1px;
+        max-width: 150px;
+        // translate: 0 -1px;
     }
     #name-input, #value-input {
         font-size: 1.2em;
@@ -160,6 +177,12 @@
             border-bottom: 1px solid var(--c-light-grey);
             width: 50px;
             margin: 0 5px;
+            &:focus {
+                border-bottom: 1px solid var(--c-primary);
+            }
+        }
+        #reset-point-btn {
+            translate: 0;
         }
     }
     #value-input {

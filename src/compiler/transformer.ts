@@ -1,5 +1,6 @@
 import * as ast from "./ast-nodes"
-import { DataType as DT } from "./types";
+import { DT } from "./types";
+import { allCombinations } from "./utils";
 
 const typeToGlslType = new Map<DT, string>([
     [DT.Real, "float"], [DT.Imag, "vec2"], [DT.Bool, "bool"]
@@ -7,12 +8,28 @@ const typeToGlslType = new Map<DT, string>([
 
 const TAB_STR = " ".repeat(4);
 
+// Takes a type-inferred syntax tree and outputs a glsl string
+// Probably didnt need to be a class but fits with scanner -> parser -> typechecker being classes
 export class Transformer {
-    tree: Node;
+    tree: ast.Node;
     indentLevel: number = 0;
     
-    constructor(tree: Node) {
+    constructor(tree: ast.Node) {
         this.tree = tree;
+    }
+
+    _indentStr() {
+        return TAB_STR.repeat(this.indentLevel);
+    }
+
+    _bracedBlock(node: ast.StmtList) {
+        this.indentLevel += 1; const body = this.stmtList(node); this.indentLevel -= 1;
+        return `{\n${body}\n${this._indentStr()}}`
+    }
+    
+    _number(x: number) {
+        let out = x.toString();
+        return out.includes(".") ? out : out + ".0";
     }
 
     transform(node: ast.Node = this.tree): string {
@@ -23,7 +40,7 @@ export class Transformer {
             case ast.NT.If: return this.if(node);
             case ast.NT.For: return this.for(node);
             case ast.NT.While: return this.while(node);
-            case ast.NT.FunctionDefinition: return this.functionDefinition(node);
+            case ast.NT.FuncDef: return this.funcDef(node);
             case ast.NT.Break: return this.break(node);
             case ast.NT.Return: return this.return(node);
             case ast.NT.Grouping: return this.grouping(node);
@@ -31,17 +48,12 @@ export class Transformer {
             case ast.NT.Unary: return this.unary(node);
             case ast.NT.Literal: return this.literal(node);
             case ast.NT.Variable: return node.name;
-            case ast.NT.FunctionCall: return this.functionCall(node);
+            case ast.NT.FuncCall: return this.funcCall(node);
 
             default: const _exhaustiveCheck: never = node;
-                // return `[unknown node: ${ast.NT[node.nodeType]}]`
         }
     }
 
-    _indentStr() {
-        return TAB_STR.repeat(this.indentLevel);
-    }
-    
     stmtList(node: ast.StmtList) {
         let strs = []
         for (let stmt of node.statements) {
@@ -52,14 +64,10 @@ export class Transformer {
         return this._indentStr() + strs.join("\n" + this._indentStr())
     }
 
-    _bracedBlock(node: ast.StmtList) {
-        this.indentLevel += 1; const body = this.stmtList(node); this.indentLevel -= 1;
-        return `{\n${body}\n${this._indentStr()}}`
-    }
 
     declaration(node: ast.Declaration) {
-        const modifier = "float"; // TODO: type analysis of rhs expr
-        return `${modifier} ${node.name} = ${this.transform(node.value)}`;
+        const glslType = typeToGlslType.get(node.value.dataType);
+        return `${glslType} ${node.name} = ${this.transform(node.value)}`;
     }
 
     assignment(node: ast.Assignment) {
@@ -72,16 +80,25 @@ export class Transformer {
         return out;
     }
 
-    for(node: ast.For) {
-        return "";
+    for(node: ast.For) { 
+        let {loopvar, start, end, step, body} = node;
+        let startStr = this.transform(start), endStr = this.transform(end), stepStr = this.transform(step);
+        return `for (float ${loopvar} = ${startStr}; ${loopvar} <= ${endStr}; ${loopvar} += ${stepStr}) ${this._bracedBlock(body)}`;
     }
 
     while(node: ast.While) {
-        return "";
+        return `while (${this.transform(node.condition)}) ${this._bracedBlock(node.body)}`
     }
 
-    functionDefinition(node: ast.FunctionDefinition) {
-        return "";
+    funcDef(node: ast.FunctionDefinition) {
+        let {name, params, body, dataType} = node
+        let returnTypeStr = typeToGlslType.get(dataType);
+        let overloads = [];
+        for (let paramTypes of allCombinations(["vec2"], params.length)) {
+            let func = `${returnTypeStr} ${name}(${params.map((p, i) => paramTypes[i]+" "+p).join(", ")}) ${this._bracedBlock(body)}`;
+            overloads.push(func);
+        }
+        return overloads.join("\n");
     }
 
     break(node: ast.Break) { 
@@ -97,31 +114,48 @@ export class Transformer {
     }
 
     binary(node: ast.Binary) {
-        // TODO: check types and 
-        // 1. promote real to vec2(x, 0) when necessary (only for real+-imag)
-        // 2. call lib-funcs when necessary (imag*imag, real/imag, imag/imag)
-        return "";
+        const leftStr = this.transform(node.left), rightStr = this.transform(node.right);
+        const leftType = node.left.dataType, rightType = node.right.dataType;
+        const opStr = node.op.lexeme;
+        const defaultOut = `${leftStr} ${opStr} ${rightStr}`
+
+        // Code would be simpler if we just implemented all overloads in complex.glsl
+        // But we try to avoid function calls when normal glsl binary ops do the right thing, for performance
+        // Dont know if it actually makes a difference but cant hurt
+        switch(opStr) {
+            case "-": case "+": 
+                if (leftType === DT.Real && rightType === DT.Imag) return `vec2(${leftStr}, 0.0) ${opStr} ${rightStr}`;
+                if (leftType === DT.Imag && rightType === DT.Real) return `${leftStr} ${opStr} vec2(${rightStr}, 0.0)`;
+                return defaultOut;
+            case "*":         
+                if (leftType === DT.Imag && rightType === DT.Imag) return `Mul(${leftStr}, ${rightStr})`;
+                return defaultOut;
+            case '/':
+                if (rightType === DT.Real) return defaultOut
+                return `Div(${leftStr}, ${rightStr})`
+            case "^":
+                return `Pow(${leftStr}, ${rightStr})`
+            case "<": case ">": case "<=": case ">=": 
+                return defaultOut
+        }
     }
 
     unary(node: ast.Unary) {
-        return `${node.op}${this.transform(node.expr)}` 
+        return `${node.op.lexeme}${this.transform(node.expr)}` 
     }
 
-    functionCall(node: ast.FunctionCall) {
-        return `${node.callee.name}(${node.args.join(', ')})`
-    }
-
-    _number(x: number) {
-        let out = x.toString();
-        return out.includes(".") ? out : out + ".0";
+    funcCall(node: ast.FunctionCall) {
+        const argStrs = node.args.map(x => this.transform(x))
+        return `${node.callee.name}(${argStrs.join(', ')})`
     }
 
     literal(node: ast.Literal) {
         const {dataType: type, value} = node;
         switch (type) {
+            case DT.Bool: return value === true ? 'true' : 'false';
             case DT.Real: return this._number(value as number);
             case DT.Imag: return `vec2(0.0, ${this._number(value as number)})`;
-            case DT.Bool: return value === true ? 'true' : 'false';
+            default: const _exhaustiveCheck: never = type;
         }
     }
 }
