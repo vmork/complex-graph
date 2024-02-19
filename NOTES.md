@@ -1,6 +1,7 @@
 ## Misc
 - Dont try to make the sidebar collapse a smooth transition, it doesnt work
 - You cant use classes as discriminated union, only interfaces
+- `npm run build && git subtree push --prefix public origin gh-pages` to deploy to gh-pages
 
 ## Links
 - [glsl tips](https://shadertoyunofficial.wordpress.com/2019/01/02/programming-tricks-in-shadertoy-glsl/)
