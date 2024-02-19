@@ -4,7 +4,6 @@ src/compiler/dist/
 node_modules/
 
 # Ignore build output
-public/build
 
 # Ignore IDE and editor files
 .vscode/
