@@ -1,11 +1,14 @@
 import {Scanner} from './scanner'
 import { Parser } from './parser'
 import { Transformer } from './transformer'
-import { TypeChecker } from './typechecker'
+import { TypeChecker, VariableEnv } from './typechecker'
 import { treeAsJson } from './utils'
 import { CompileError, SyntaxErr } from './error'
 import * as ast from './ast-nodes'
 import { Token } from './token'
+import { glslType, glslTypeToDT } from './types'
+
+export { VariableEnv }
 
 export const settings = {
     maxFunctionParams: 5,
@@ -19,24 +22,27 @@ export type compilerOutput = {
     errors: CompileError[]
 }
 
-export function compile(src: string, skipTypeCheck: boolean = false): compilerOutput {
+export function compile(src: string, userVariables: Map<string, glslType>, 
+    skipTypeCheck=false): compilerOutput {
+
     let tokens: Token[], astTree: ast.Node, glslString: string, errors: CompileError[] = [];
 
     try {
         let scanner = new Scanner(src);
         tokens = scanner.scan();
-        // console.log(tokens.map(t => t.toString()));
     
         let parser = new Parser(tokens);
         astTree = parser.parse();
-        // console.log(treeAsJson(tree));
 
-        let typechecker = new TypeChecker(astTree);
-        if (!skipTypeCheck) typechecker.typecheck();
+        const varEnv: VariableEnv = new Map();
+        for (const [name, type] of userVariables.entries()) {
+            varEnv.set(name, { type: glslTypeToDT.get(type) })
+        }
+        let typechecker = new TypeChecker(astTree, varEnv);
+        if (!skipTypeCheck) typechecker.typecheckTree();
     
         let transformer = new Transformer(astTree);
         glslString = transformer.transform();
-        // console.log("output:\n" + glsl);
 
     } catch (err) {
         if (err instanceof CompileError) {

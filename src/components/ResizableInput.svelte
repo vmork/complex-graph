@@ -3,13 +3,14 @@
 <script lang="ts">
     export let type: "text"|"number";
     export let value: string|number;
+    export let step: number = 0.001;
 </script>
 
 <div id="container">
     <span>{value}</span>
     <!-- Not allowed to have dynamic type apparently, so have to do this -->
     {#if type === "text"}       <input type="text" bind:value={value} on:input>
-    {:else if type === "number"}<input type="number" bind:value={value} on:input>{/if}
+    {:else if type === "number"}<input type="number" bind:value={value} on:input step={step}>{/if}
 </div>
 
 <style lang="scss">

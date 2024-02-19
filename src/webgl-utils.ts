@@ -1,10 +1,13 @@
-class ShaderError extends Error {
+class glslShaderError extends Error {
     message: string; shaderType: number; fileName: string;
     constructor(message: string, shaderType: number, fileName: string) {
         super(message);
         this.name = "ShaderError";
         this.shaderType = shaderType;
         this.fileName = fileName;
+    }
+    toString() {
+        return `GLSL ERROR: ${this.message}`
     }
 }
 
@@ -46,7 +49,7 @@ async function getShaderText(url: string) {
 }
 
 export { 
-    ShaderError,
+    glslShaderError as ShaderError,
     resizeCanvasToDisplaySize, 
     bufferFullscreenQuad,
     getShaderText, 

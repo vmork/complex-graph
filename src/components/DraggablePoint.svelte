@@ -19,7 +19,7 @@
         canvasPos = {x: x - pointSizePx/2, y: y - pointSizePx/2};
         
         let worldPos = canvas.camera.screenToWorld(x, y);
-        data.x = roundToDigits(worldPos.x,3); data.y = roundToDigits(worldPos.y,3);
+        data.x = worldPos.x; data.y = worldPos.y;
         $uvars = $uvars
 
         if (data.name.trim()) {

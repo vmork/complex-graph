@@ -89,7 +89,8 @@ export class Parser {
             default:
                 this.error("Excpected statement");
         }
-        if ([ast.NT.If, ast.NT.For, ast.NT.While].includes(stmt.nodeType)) return stmt; // newline has already been handled
+        // newline has already been handled in these cases
+        if ([ast.NT.If, ast.NT.For, ast.NT.While, ast.NT.FuncDef].includes(stmt.nodeType)) return stmt; 
 
         this.matchOrError([TT.NEWLINE, TT.SEMICOLON, TT.EOF], "Unexcpected token " + this.peek().lexeme)
 
@@ -153,6 +154,7 @@ export class Parser {
         else { // f(x) := expr  ->  f(x) := { return expr }
             let stmt = { nodeType: ast.NT.Return, value: this.expression() } as ast.Return
             body = { nodeType: ast.NT.StmtList, statements: [stmt] } as ast.StmtList
+            this.matchOrError([TT.NEWLINE, TT.SEMICOLON, TT.EOF], "Unexcpected token " + this.peek().lexeme)
         }
 
         return {nodeType: ast.NT.FuncDef, name, params, body} as ast.FunctionDefinition

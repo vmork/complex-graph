@@ -5,11 +5,12 @@ import { treeAsJson } from "./utils";
 const LS = "-".repeat(20)
 const LS2 = "-".repeat(20)
 
-function runSnippet(id: string, src: string, skipTypeCheck=false, logAst=false) {
-    let cOut = compile(src, skipTypeCheck) 
+function runSnippet(id: string, src: string, skipTypeCheck=false, logAst=false, logTokens=false) {
+    let cOut = compile(src, new Map(), skipTypeCheck) 
     let outStr = cOut.errors.length > 0 ? cOut.errors[0].toString() : cOut.glslString
 
     if (logAst) console.log(treeAsJson(cOut.astTree))
+    if (logTokens) console.log(cOut.tokens.map(x => x.toString()));
 
     let expectedError = id.startsWith("bad")
     let hadError = cOut.errors.length > 0
@@ -45,10 +46,18 @@ operation4: `x := a b c`,
 operation5: `x := 2a b c`,
 
 for1: `for j = -2^3..10..2: break`,
-for2: `
-for j = 1..10:
-    for k = 1..2..12: break
-    x := 1`,
+
+indents1: `
+if true:
+    if true:
+        break
+    x := 1
+y := 2`,
+indents2: `
+if true:
+    if true:
+        if true: break
+    break`,
 
 if1: `if true: x = 1`,
 if2: `if true: x = 1; else: x = 2`,
@@ -64,6 +73,22 @@ funcdef4: `
 f(x, y) :=
     x = y
     break`,
+funcdef5: `
+f(x) := 
+    return 2x
+g(x) := 
+    return 3x`,
+funcdef6: `f(x) := 2x; g(x) := 3x`,
+funcdef7: `
+f(x) := 2x
+g(x) := 3x`,
+funcdef8: `
+f(x) := 
+    if true:
+        return 1
+    return 2
+
+g(x) := x`,
 
 badFuncdef1: `f(x,) := 1`,
 badFuncdef2: `f() = 12`,
@@ -76,33 +101,59 @@ funcCall2: `x := f(1, 2)x g(1);`,
 }
 
 const typecheckSnippets = {
-declaration1: `x := 1; y := 2`,
-badDeclaration1: `pi := 1`,
-badDeclaration2: `x := 1; x := 2`,
-badDeclaration3: `x = 1`,
+scope1: `x := 1; y := 2; x = 1; y = 3`,
+scope2: `if true: x := 1; elif true: x := 2; else: x := 3`,
+scope3: `
+y := 1
+if true: 
+    x := 2
+    if true: y = 2`,
 
-if1: `if true: x := 1`,
-if2: `if true: x := 1; elif true: x = 2`
+badScope1: `pi := 1`,
+badScope2: `x := 1; x := 2`,
+badScope3: `x = 1`,
+badScope4: `if true: x := 1; else: x = 2`,
 
-// funcdef1: `f() := 1`,
-// funcdef2: `f(x) := 2x`,
-// funcdef3: `f(x, y) := x y`,
-// funcdef4: `
-// f(x) := 
-//     return x + 1
-//     return x`,
+if1: `if 1 < 2: break`,
+badIf1: `if 1: break`,
 
-// badFuncdef1: `f(x, x) := x`,
-// badFuncdef2: `
-// f() := 
-//     x := 2`,
+for1: `for j = 1..10: x := 2j`,
+for2: `for j = 1..10: x := 2j; break`,
+badFor1: `for j = 1..10: x := 2j; break; x := 2j`,
 
-// badFuncdef3: `
-// f() := 
-//     if true: return 1
-//     if false: return i`
+while1: `while true: x := 1`,
+badWhile1: `while 1: x := 1`,
+
+funcdef1: `f() := 1`,
+funcdef2: `f(x) := 2x`,
+funcdef3: `f(x, y) := x y`,
+funcdef4: `
+f(x) := 
+    x = 1 + i
+    if true: return x + 1
+    else: return x`,
+
+badFuncdef1: `f(x, x) := x`,
+badFuncdef2: `
+f() := 
+    x := 2`,
+badFuncdef3: `
+f(x) := 
+    x = 1 + i
+    if true: return x
+    else: return 1`,
+badFuncdef4: `sin(x) := cos(x)`,
+
+funcCall1: `f(x) := tan(arctan(x) + i)`,
+funcCall2: `x := conj(abs(sin(cos(arctan(re(im(i)))))))`,
+funcCall3: `f(x) := 2x; x := f(i)`,
+funcCall4: `x := cos(i); a := x*2sin(x)^2`,
+
+badFuncCall1: `x := g(1)`,
+badFuncCall2: `x := sin(true)`,
+badFuncCall3: `f(x, y) := x y; z := f(i, 1 < 2)`
 }
     
-
-// runAllSnippets(parsingSnippets, true);
-runAllSnippets(typecheckSnippets, false, false)
+// runSnippet('for2', parsingSnippets['for2'], true, false, true)
+runAllSnippets(parsingSnippets, true);
+// runAllSnippets(typecheckSnippets, false, false)

@@ -14,10 +14,10 @@
     - Or just presets that map to different glsl functions? (yes)
 
 - Add home button
-
-- Custom language
-    - write down rough spec
-    - javascript/python ?
-
-- Fix so that wheel zoom events are triggered when mouse is over points
 - Add labels to points (positioning)
+
+- Add prefix to each user defined variable to avoid name clashing in fragment.glsl
+- Add more functions (iterate, julia, mandelbrot)
+    - Implement in glsl or lslg?
+    - How to do higher order functions correctly?
+- Add anonymous functions (how?)

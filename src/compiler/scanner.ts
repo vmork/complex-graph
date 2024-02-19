@@ -124,7 +124,13 @@ export class Scanner {
         this.line += 1;
         const lastIndentLevel = this.indentLevels[this.indentLevels.length-1]
 		const newIndentLevel = this.getIndentLevel();
-		if (this.peek() === "\n" || this.peek() === EOF) return; // ignore double newlines and indent before EOF
+
+        if (this.peek() === "#") { // skip lines that are only comments, to avoid adding double newlines
+            this.scanComment();
+            return;
+        }
+        if (this.peek() === "\n" || this.peek() === EOF) return; // skip double newlines and indent before EOF
+        
         this.addToken(TT.NEWLINE);
 
         if (newIndentLevel > lastIndentLevel) {
@@ -139,7 +145,6 @@ export class Scanner {
             if (this.indentLevels[this.indentLevels.length-1] !== newIndentLevel) {
                 throw new SyntaxErr("Dedent level doesnt match previous indents", this.line)
             }
-            this.indentLevels.push(newIndentLevel);
         }
 	}
 

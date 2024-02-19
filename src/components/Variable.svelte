@@ -1,9 +1,10 @@
 <script lang="ts">
     import { createEventDispatcher } from "svelte";
     import { onMount } from "svelte";
-    import { scale } from "svelte/transition";
+    import { scale, fade } from "svelte/transition";
     import type { UserVariable, UserSlider } from "../types";
     import ResizableInput from "./ResizableInput.svelte";
+    import { roundToDigits } from "../utils";
 
     export let data: UserVariable;
     
@@ -11,8 +12,16 @@
     let showEditUI = false;
     let prevName = data.name;
 
+    let displayX, displayY;
+    $: {
+        if (data.type === "vec2") {
+            displayX = roundToDigits(data.x, 3);
+            displayY = roundToDigits(data.y, 3);
+        }
+    }
+
     function resetPoint() {
-        if (data.type === "point") {
+        if (data.type === "vec2") {
             data.x = 0; data.y = 0;
         }
         onValueChange();
@@ -22,26 +31,32 @@
     function onNameChange() {
         dispatch("nameChange", {prevName: prevName, data: data});
         prevName = data.name;
+    }
 
+    function onPointValueChange(xory: "x" | "y", e) {
+        if (data.type !== "vec2") return; //typescript
+        if (xory === "x") data.x = e.target.value;
+        if (xory === "y") data.y = e.target.value;
+        onValueChange();
     }
 
     function onValueChange() {
+        console.log("value change", data)
         dispatch("valueChange", data);
         updateMinMax();
     }
 
     function updateMinMax() {
-        if (data.type === "slider") {
+        if (data.type === "float") {
             data.min = Math.min(data.min, data.value);
             data.max = Math.max(data.max, data.value);
         }
     }
 </script>
 
-<div id="container" on:keydown={(e) => { if (e.key === "Enter") showEditUI = false }} 
-        transition:scale|local={{ duration: 200 }}>
+<div id="container" on:keydown={(e) => { if (e.key === "Enter") showEditUI = false }} >
     <div id="row1">
-        {#if data.type === "point"}
+        {#if data.type === "vec2"}
             <input type="color" id="color-picker" 
                 bind:value={data.color}
                 on:input={onValueChange}
@@ -52,12 +67,14 @@
 
         <span class="non-clickable">=</span>
 
-        {#if data.type === "slider"}
+        {#if data.type === "float"}
             <input id="value-input" type="number" min={data.min} max={data.max} step={data.step} 
                 bind:value={data.value} on:input={onValueChange}/>
-        {:else if data.type === "point"}
-            <ResizableInput type="number" bind:value={data.x} on:input={onValueChange}/> <span class="non-clickable">+</span>
-            <ResizableInput type="number" bind:value={data.y} on:input={onValueChange}/> <span class="non-clickable letter-i">i</span>
+        {:else if data.type === "vec2"}
+            <ResizableInput type="number" value={displayX} 
+                on:input={(e) => onPointValueChange('x', e)} step={0.001}/> <span class="non-clickable">+</span>
+            <ResizableInput type="number" value={displayY} 
+                on:input={(e) => onPointValueChange('y', e)} step={0.001}/> <span class="non-clickable letter-i">i</span>
         {/if}
 
         <button id="settings-btn" on:click={() => showEditUI = !showEditUI}>
@@ -69,7 +86,7 @@
     </div>
     {#if showEditUI}
         <div id="edit-ui">
-            {#if data.type === "slider"}
+            {#if data.type === "float"}
                 <span>Min: </span><input type="number"  bind:value={data.min}/>
                 <span>Max: </span><input type="number"  bind:value={data.max}/>
                 <span>Step: </span><input type="number" bind:value={data.step}/>
@@ -78,7 +95,7 @@
             {/if}
         </div>
     {:else}
-        {#if data.type === "slider"}
+        {#if data.type === "float"}
             <div id="row2">
                 <span>{data.min}</span>
                 <input id="slider" type="range" min={data.min} max={data.max} step={data.step} 
@@ -100,14 +117,17 @@
     }
 
     #container {
+        font-size: 0.9em;
         display: flex;
         flex-direction: column;
         gap: 7px;
         padding: 10px;
         border: 1px solid var(--c-light-grey);
+        border-inline: none;
         background-color: var(--c-dark-grey);
         &:focus-within {
             border: 1px solid var(--c-primary);
+            border-inline: none;
         }
         margin: 0;
     }

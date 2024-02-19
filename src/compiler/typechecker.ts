@@ -1,58 +1,59 @@
 import * as ast from "./ast-nodes"
 import { DT } from "./types";
-import { builtinVars, builtinFuncs } from "./builtins";
+import { builtinVars, builtinFuncs, BuiltinFunctionInfo } from "./builtins";
 import { TypeErr } from "./error";
 import { functionSignature } from "./types";
-import { treeAsJson } from "./utils";
+import { arrayEqual, treeAsJson } from "./utils";
+import { settings } from "./main";
 
-type VariableInfo = { type: DT }
-type VariableEnv = Map<string, VariableInfo>
+export type VariableInfo = { type: DT }
+export type VariableEnv = Map<string, VariableInfo>
 type VariableScope = { env: VariableEnv, parent: VariableScope }
 
-type FunctionInfo = { signatures: functionSignature[] }
-type FunctionEnv = Map<string, FunctionInfo>
+export type FunctionInfo = { signatures: functionSignature[] }
+export type FunctionEnv = Map<string, FunctionInfo>
 
 type CurrentFunction = {
     name: string 
-    varScope: VariableEnv
     returnType: DT
 }
 
 export class TypeChecker {
     declaredFunctions: FunctionEnv
-    globalVarScope: VariableEnv
+    currentScope: VariableScope
     insideFuncDef: boolean = false
     currentFunction: CurrentFunction
     tree: ast.Node
 
-    constructor(tree: ast.Node) {
+    constructor(tree: ast.Node, predeclaredVars: VariableEnv) {
         this.tree = tree;
-        this.globalVarScope = new Map();
+        this.currentScope = { env: predeclaredVars || new Map(), parent: null };
         this.declaredFunctions = new Map();
     }
 
+    withNewScope(callback: () => any) {
+        const prevScope = this.currentScope;
+        this.currentScope = { env: new Map(), parent: prevScope };
+        const out = callback();
+        this.currentScope = prevScope;
+        return out;
+    }
+
     lookupVar(name: string) {
-        let v: VariableInfo;
-        if (this.insideFuncDef) {
-            v = this.currentFunction.varScope.get(name); if (v) return v;
+        let scope = this.currentScope
+        while (scope) {
+            const v = scope.env.get(name); if (v) return v;
+            scope = scope.parent;
         }
-        v = this.globalVarScope.get(name); if (v) return v;
         return builtinVars.get(name);
     }
     
     declareVar(name: string, type: DT) {
-        console.log("in declareVar: ", name, this.globalVarScope)
-        if (this.insideFuncDef) {
-            if (this.currentFunction.varScope.has(name)) this.error(`Cannot redeclare variable ${name}`);
-            this.currentFunction.varScope.set(name, { type });
-        }
-        else {
-            if (this.globalVarScope.has(name) || builtinVars.has(name)) this.error(`Cannot redeclare variable ${name}`);
-            this.globalVarScope.set(name, { type });
-        }
+        if (builtinVars.has(name) || this.currentScope.env.has(name)) this.error(`Cannot redeclare variable ${name}`);
+        this.currentScope.env.set(name, { type });
     }
 
-    error(msg: string) {
+    error(msg: string): never {
         throw new TypeErr(msg);
     }
 
@@ -66,8 +67,18 @@ export class TypeChecker {
         this.assertType(types, [DT.Bool], msg);
     }
 
-    typecheck(node: ast.Node = this.tree): DT {
-        console.log("in typecheck: ", treeAsJson(node))
+    typecheckTree() {
+        this.typecheck(this.tree)
+        let mainFunc = this.declaredFunctions.get(settings.mainFunctionName)
+        if (!mainFunc) this.error(`Must declare a main function f(z)`);
+        const requiredSignature = {in: [DT.Imag], out: DT.Imag} as functionSignature
+        console.log(mainFunc.signatures, [requiredSignature])
+        if (!arrayEqual(mainFunc.signatures, [requiredSignature])) {
+            this.error(`Main function must be of type Imag -> Imag`)
+        }
+    }
+
+    typecheck(node: ast.Node): DT {
         let type: any;
         switch (node.nodeType) {
             case ast.NT.StmtList: type = this.stmtList(node); break
@@ -77,15 +88,15 @@ export class TypeChecker {
             case ast.NT.For: type = this.for(node); break
             case ast.NT.While: type = this.while(node); break
             case ast.NT.FuncDef: type = this.funcDef(node); break
-            case ast.NT.Break: return; break
+            case ast.NT.Break: return;
             case ast.NT.Return: type = this.return(node); break
             case ast.NT.Grouping: type = this.grouping(node); break
             case ast.NT.Binary: type = this.binary(node); break
             case ast.NT.Unary: type = this.unary(node); break
             case ast.NT.Literal: type = this.literal(node); break
             case ast.NT.Variable: type = this.variable(node); break
-            // case ast.NT.FuncCall: type = this.funcCall(node);
-            default: this.error("Unsupported node: " + ast.NT[node.nodeType])
+            case ast.NT.FuncCall: type = this.funcCall(node); break
+            default: const _exhaustiveCheck: never = node;
         }
         node.dataType = type;
         return type;
@@ -106,6 +117,7 @@ export class TypeChecker {
         if (builtinVars.has(node.name)) this.error(`Cannot reassign builtin variable ${node.name}`);
         let v = this.lookupVar(node.name);
         if (!v) this.error(`Cannot assign to undeclared variable ${node.name}`);
+
         const rhsType = this.typecheck(node.value);
         if (v.type !== rhsType) {
             this.error(`Cannot reassign ${node.name} from type ${DT[v.type]} to ${DT[rhsType]}`);
@@ -113,26 +125,23 @@ export class TypeChecker {
     }
 
     if(node: ast.If) {
-        console.log("in if: ", node.elseBranch)
         this.assertType([this.typecheck(node.condition)], [DT.Bool], "Condition in if-statement is not of type Bool");
-
-        // prevScope = this.varScope 
-        // this.varScope = { vars: {}, parent: prevScope }
-        this.typecheck(node.mainBranch);
-        // this.varScope = prevScope
-
-        if (node.elseBranch) this.typecheck(node.elseBranch);
+        this.withNewScope(() => this.typecheck(node.mainBranch));
+        if (node.elseBranch) this.withNewScope(() => this.typecheck(node.elseBranch));
     }
 
     for(node: ast.For) {
         const [startType, endType, stepType] = [node.start, node.end, node.step].map(x => this.typecheck(x));
         this.assertType([startType, endType, stepType], [DT.Real], "For-loop bounds are not of type Real");
-        this.typecheck(node.body);
+        this.withNewScope(() => {
+            this.declareVar(node.loopvar, DT.Real);
+            this.typecheck(node.body)
+        });
     }
 
     while(node: ast.While) {
         this.assertType([this.typecheck(node.condition)], [DT.Bool], "Condition in while-loop is not of type Bool");
-        this.typecheck(node.body);
+        this.withNewScope(() => this.typecheck(node.body));
     }
 
     funcDef(node: ast.FunctionDefinition) {
@@ -140,15 +149,16 @@ export class TypeChecker {
             this.error(`Cannot redeclare function ${node.name}`);
         }
         this.insideFuncDef = true;
-        this.currentFunction = {name: node.name, varScope: new Map(), returnType: null}
+        this.currentFunction = {name: node.name, returnType: null}
         const inputTypes = node.params.map(x => DT.Imag) // only allowing imaginary params in user defined functions for now
+        
+        this.withNewScope(() => {
+            node.params.forEach((x, i) => this.declareVar(x, inputTypes[i]))
+            this.typecheck(node.body)
+        });
 
-        node.params.forEach((x, i) => this.declareVar(x, inputTypes[i]))
-
-        this.typecheck(node.body);
         const returnType = this.currentFunction.returnType; // should be set when typechecking body and encountering return
         if (!returnType) this.error(`Function ${node.name} doesnt return a value`)
-
         const signature = {in: inputTypes, out: returnType} as functionSignature;
         this.declaredFunctions.set(node.name, { signatures: [signature] });
 
@@ -179,7 +189,7 @@ export class TypeChecker {
             return DT.Imag;
         }
         if (["<", ">", "<=", ">="].includes(op.lexeme)) {
-            this.assertNumeric([leftType, rightType], `Wrong operand types for ${op.lexeme}: ${DT[leftType]}, ${DT[rightType]}`);
+            this.assertType([leftType, rightType], [DT.Real], `Wrong operand types for ${op.lexeme}: ${DT[leftType]}, ${DT[rightType]}`);
             return DT.Bool;
         }
     }
@@ -202,5 +212,19 @@ export class TypeChecker {
         let v = this.lookupVar(node.name);
         if (!v) this.error(`Undeclared variable ${node.name}`);
         return v.type;
+    }
+
+    funcCall(node: ast.FunctionCall) {
+        let name = node.callee.name;
+        let f = builtinFuncs.get(name);
+        if (f) node.callee.name = f.glslName;
+        else f = this.declaredFunctions.get(name)
+        if (!f) this.error(`Undeclared function ${name}`);
+        
+        const inputTypes = node.args.map(expr => this.typecheck(expr));
+        for (let sig of f.signatures) {
+            if (arrayEqual(sig.in, inputTypes)) return sig.out;
+        }
+        this.error(`Wrong argument types for ${name}: [${inputTypes.map(t => DT[t]).join(', ')}]`)
     }
 }

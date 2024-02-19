@@ -24,10 +24,14 @@ function treeAsJson(tree: ast.Node) {
     return JSON.stringify(expandTypes(copy), null, 4);
 }
 
-
 function allCombinations<T>(values: T[], n: number): T[][] {
     if (n === 0) return [[]];
     return values.flatMap(v => allCombinations(values, n-1).map(c => [v].concat(c)));
 }
 
-export { treeAsJson, allCombinations }
+function arrayEqual<T>(a: T[], b: T[]) {
+    if (a.length !== b.length) return false;
+    return JSON.stringify(a) == JSON.stringify(b);
+}
+
+export { treeAsJson, allCombinations, arrayEqual }

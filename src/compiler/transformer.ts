@@ -1,10 +1,7 @@
 import * as ast from "./ast-nodes"
 import { DT } from "./types";
 import { allCombinations } from "./utils";
-
-const typeToGlslType = new Map<DT, string>([
-    [DT.Real, "float"], [DT.Imag, "vec2"], [DT.Bool, "bool"]
-])
+import { typeToGlslType } from "./types";
 
 const TAB_STR = " ".repeat(4);
 
@@ -134,6 +131,7 @@ export class Transformer {
                 if (rightType === DT.Real) return defaultOut
                 return `Div(${leftStr}, ${rightStr})`
             case "^":
+                if (leftStr === "e") return `Exp(${rightStr})`
                 return `Pow(${leftStr}, ${rightStr})`
             case "<": case ">": case "<=": case ">=": 
                 return defaultOut

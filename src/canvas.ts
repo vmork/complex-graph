@@ -2,7 +2,12 @@ import type { Point } from "./types";
 import { Camera } from "./camera";
 import * as utils from "./webgl-utils";
 import { ProgramManager, Uniform, UniformType, UniformValue } from "./webgl-program";
-import { shaderError } from "./stores";
+import { compilationErrors } from "./stores";
+import { compile } from "./compiler/main";
+import { uvars } from "./stores";
+import { get } from "svelte/store";
+import { WorkspaceData } from "./workspace";
+import { cloneMap } from "./utils";
 
 type Settings = Map<string, {type: UniformType, value: any}>
 
@@ -13,32 +18,32 @@ class Canvas {
     compFbo: WebGLFramebuffer;
     mainProgram: ProgramManager;
     compProgram: ProgramManager;
-    userFunctionSrc: string;
+    userCodeGlsl: string;
     mousePos: Point = {x: 0, y: 0};
+    defaultWorkspace: WorkspaceData;
 
-    settings: Settings = new Map(Object.entries({
+    defaultSettings: Settings = new Map(Object.entries({
         'showGrid': {type: 'bool', value: false},
         'gridSpacing': {type: 'float', value: 1.0},
         'showModContours': {type: 'bool', value: true},
         'showPhaseContours': {type: 'bool', value: false},
     }))
+    settings: Settings = cloneMap(this.defaultSettings)
 
-    constructor(canvas: HTMLCanvasElement, userFunctionSrc: string) {
+    constructor(canvas: HTMLCanvasElement, workspace: WorkspaceData) {
         this.c = canvas;
         this.mousePos = {x: 0, y: 0};
-        this.userFunctionSrc = userFunctionSrc;
+
+        this.defaultWorkspace = workspace;
+        uvars.set(workspace.vars);
+        this.compileUserCodeToGlsl(workspace.code, false);
     }
 
-    updateSetting(name: string, value: any, render: boolean=true) {
+    updateSetting(name: string, value: any, render=true) {
         if (!this.settings.has(name)) throw new Error(`setting ${name} doesnt exist`);
-        this.settings.set(name, value);
+        this.settings.get(name).value = value;
         this.mainProgram.setUniformValue(`u_${name}`, value);
-        console.log("setting", name, value)
         if (render) this.render();
-    }
-    getSettingValue(name: string) {
-        if (!this.settings.has(name)) throw new Error(`setting ${name} doesnt exist`)
-        return this.settings.get(name).value
     }
 
     addUniform(name: string, value: UniformValue=null, type: UniformType="float") {
@@ -46,7 +51,7 @@ class Canvas {
         this.compProgram.addUniform(new Uniform(name, type));
         this.setUniformValue(name, value);
     }
-    deleteUniform(name: string, recompile=true) {
+    deleteUniform(name: string) {
         this.mainProgram.deleteUniform(name);
         this.compProgram.deleteUniform(name);
     }
@@ -55,22 +60,47 @@ class Canvas {
         this.compProgram.setUniformValue(name, value);
     }
 
+    addUniformsFromWorkspace(workspace: WorkspaceData) {
+        workspace.vars.forEach(v => {
+            if (v.type === "float") this.addUniform(v.name, v.value, "float");
+            if (v.type === "vec2") this.addUniform(v.name, [v.x, v.y], "vec2");
+        })
+    }
+
+    loadNewWorkSpace(workspace: WorkspaceData) {
+        get(uvars).forEach(v => this.deleteUniform(v.name));
+        uvars.set(workspace.vars);
+        this.addUniformsFromWorkspace(workspace);
+        this.compileUserCodeToGlsl(workspace.code, true);
+    }
+
     recompilePrograms() {
+        console.log(this.mainProgram.uniforms)
         try {
-            this.mainProgram.recompile(this.userFunctionSrc);
-            this.compProgram.recompile(this.userFunctionSrc);
+            this.mainProgram.recompile(this.userCodeGlsl);
+            this.compProgram.recompile(this.userCodeGlsl);
         }
         catch (e) {
-            shaderError.set(e);
+            compilationErrors.set([e]);
             return;
         }
-        shaderError.set(null);
+        compilationErrors.set([]);
         this.render();
     }
 
-    updateUserFunction(userFunctionSrc: string) {
-        this.userFunctionSrc = userFunctionSrc;
-        this.recompilePrograms();
+    compileUserCodeToGlsl(src: string, recompileProgramsAfter=true) {
+        const uvarsSimple = new Map(get(uvars).map(x => [x.name, x.type]))
+        console.log(uvarsSimple)
+        const cOut = compile(src, uvarsSimple);
+        console.log("compiler output: ", cOut);
+        if (cOut.errors.length > 0) {
+            compilationErrors.set(cOut.errors)
+        }
+        else {
+            compilationErrors.set([]);
+            this.userCodeGlsl = cOut.glslString;
+            if (recompileProgramsAfter) this.recompilePrograms(); // should always happen except on init
+        }
     }
 
     computeFval(p : Point) : Point {
@@ -138,16 +168,20 @@ class Canvas {
         this.settings.forEach((v, k) => {
             mainProgram.addUniform(new Uniform(`u_${k}`, v.type, v.value))
         })
-        await mainProgram.compileFromUrls("shaders/vertex.glsl", "shaders/fragment.glsl", this.userFunctionSrc);
+        this.mainProgram = mainProgram;
         // console.table(Array.from(mainProgram.uniforms.values()).map(u => [u.name, u.value]))
 
         let compProgram = new ProgramManager(gl, [
             new Uniform("u_point", "vec2"),
-        ]);
-        await compProgram.compileFromUrls("shaders/vertex-comp.glsl", "shaders/fragment-comp.glsl", this.userFunctionSrc);
+        ])
+        this.compProgram = compProgram
+
+        this.addUniformsFromWorkspace(this.defaultWorkspace);
+
+        await mainProgram.compileFromUrls("shaders/vertex.glsl", "shaders/fragment.glsl", this.userCodeGlsl);
+        await compProgram.compileFromUrls("shaders/vertex-comp.glsl", "shaders/fragment-comp.glsl", this.userCodeGlsl);
 
         if (!(mainProgram && compProgram)) { return; }
-        this.mainProgram = mainProgram; this.compProgram = compProgram;
         
         const aPositionLocation = gl.getAttribLocation(mainProgram.id, "a_position");
 		utils.bufferFullscreenQuad(gl, aPositionLocation);

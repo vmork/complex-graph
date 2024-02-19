@@ -1,18 +1,4 @@
 ## Notes 
-- How to determine types of parameters in function definition:
-    - Assume all types are either float or vec2 (allowing ie higher order functions is just too complicated, and bool arguments are sort of useless).
-    - Write all possible overloads (2^{number of params}), limit number of params to like 5
-
-- glsl doesnt allow nested function declarations, so easiest not to do so either
-- If a function body has branching in it, require that all branches return the same type and raise error if not
-- both e and i are reserved identifiers
-- Builtin functions: re, im, conj, abs, arg, exp (e^), inv (^-1), pow (^), sqrt (^0.5), sin, cos, tan, arccos, arcsin, arctan
-- Information related to builtin function:
-    - lslg name
-    - implementation name
-    - return type
-    - input signatures (most funcs have multiple signatures, ie abs, sqrt, pow, all trig funcs)
-
 - Resolving function calls:
     - if name is in list of builtin functions:
         - Check that type signatures match, raise error if not
@@ -24,18 +10,16 @@
         - Set node type to return type
     - else: error
 
-- There should be a map `env` of (varname -> type) that is updated for every declaration.
-  A declaration inside a function body only updates the local scoped env, which is init'd to copy of global env.
-  We dont allow nested function definitions so should be simple.
-  Need to update with sliders and points from gui at init time.
+# Functions
+iterate(f, N, z) := 
+    for j = 1..N: z = f(z)
+    return z
 
-- Resolving assignment
-    - if name hasnt been declared: error
-    - if name is reserved: error
-    - if type of rhs doesnt match env.get(name): error
-- Resolving declaration
-    - if already declared or reserved: error
-    - else: env.set(name, type of rhs)
+mandelbrot(f, c, N) := iterate(@(z) -> f(z, c), N, 0+0i)
+
+mandelbrot(c, N) := mandebrot(@(z,c) -> z^2 + c, c, N)
+
+julia(f, z, c, N) := iterate(@(z) -> f(z, c), N, z)
 
 ## Examples
 

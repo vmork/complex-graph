@@ -5,11 +5,12 @@
     import CoordinateBox from "./CoordinateBox.svelte";
     import Sidebar from "./Sidebar.svelte";
 	import { getShaderText } from "../webgl-utils";
-	import { uvars } from "../stores";
+	import { compilationErrors, uvars } from "../stores";
 	import { resizeCanvasToDisplaySize } from "../webgl-utils";
 
 	import Split from "split.js";
     import DraggablePoint from "./DraggablePoint.svelte";
+    import { WorkspaceData, workspaceExamples, defaultWorkspaceName } from "../workspace";
 
 	let canvas: Canvas;
 	let canvasIsReady: boolean = false;
@@ -24,6 +25,8 @@
 	let gutterElem: HTMLDivElement;
 	let split: Split.Instance;
 	let lastSplitSizes: number[] = [40, 60];
+	let showUI = true;
+	let workspace = workspaceExamples[defaultWorkspaceName];
 
 	$: if (split) {
 		if (sidebarCollapsed) gutterElem.style.display = "none";
@@ -35,7 +38,7 @@
 
 		split = Split(["#sidebar-div", "#canvas-div"], {
 			sizes: lastSplitSizes,
-			minSize: [350, 250],
+			minSize: [380, 250],
 			gutterSize: 5,
 			gutterAlign: "start",
 			onDragEnd: () => {
@@ -44,17 +47,18 @@
 		});
 		gutterElem = document.querySelector(".gutter");
 
-		let defaultUserFunction = await getShaderText("shaders/default-func.glsl");	
-		console.log(defaultUserFunction)
-
-		canvas = new Canvas(canvasElem, defaultUserFunction);
-		await canvas.init((s) => console.error(s));
+		canvas = new Canvas(canvasElem, workspace);
+		if ($compilationErrors.length > 0) {
+			console.error("error in default workspace code: ", $compilationErrors[0].toString())
+		}
+		else {
+			await canvas.init((s) => console.error(s));
+		}
 		canvasIsReady = true;
 
 		canvasElem.addEventListener("mousedown", (e) => draggingCanvas = true)
 		canvasElem.addEventListener("mouseup", (e) => draggingCanvas = false)
 		canvasElem.addEventListener("mouseleave", (e) => draggingCanvas = false) // prevent jank when dragging onto point
-
 		canvasElem.addEventListener("mousemove", (e) => {
 			if (draggingCanvas) canvas.camera.move(e.movementX, e.movementY);
 			mousePos = canvas.camera.screenToWorld(e.offsetX, e.offsetY);
@@ -70,12 +74,18 @@
 			cameraChange = !cameraChange; // trigger reactivity
 			canvas.render();
 		})
+
+		function resetCamera() { canvas.camera.reset(); }
+		function toggleUI() { showUI = !showUI; sidebarCollapsed = !showUI }
+
 		document.addEventListener("keydown", (e) => {
-			if (e.key == "h") {
-				canvas.camera.reset();
-				canvas.render();
+			if (document.activeElement !== document.body) return;
+			switch (e.key) {
+				case "h": resetCamera(); break;
+				case "u": toggleUI(); break;
 			}
 		})        
+
 		let resizeObserver = new ResizeObserver(() => {
 			resizeCanvasToDisplaySize(canvasElem);
 			canvas.camera.scale.x = canvas.camera.scale.y * canvas.camera.aspect();
@@ -93,14 +103,14 @@
 		style:display={sidebarCollapsed ? "none": "block"}>
 		
 		{#if canvasIsReady}
-			<Sidebar canvas={canvas} bind:collapsed={sidebarCollapsed}
-			on:variableChange={(e) => {if (e.detail.type === "point") pointChange = !pointChange}}/>
+			<Sidebar canvas={canvas} editorText={workspace.code} bind:collapsed={sidebarCollapsed}
+			on:variableChange={(e) => {if (e.detail.type === "vec2") pointChange = !pointChange}}/>
 		{/if}
 	</div>
 
 	
 	<div id="canvas-div" bind:this={canvasDiv}>
-		{#if sidebarCollapsed}
+		{#if sidebarCollapsed && showUI}
 			<button id="expand-btn" on:click={() => sidebarCollapsed = false}>
 				<i class="bi bi-chevron-double-right"></i>
 			</button>
@@ -108,18 +118,18 @@
 
 		<canvas bind:this={canvasElem}></canvas>
 
-		{#if canvasIsReady}
-		{#key [cameraChange, pointChange]}
-		{#each $uvars as v (v.id)}
-			{#if v.type === "point"}
-				<DraggablePoint canvas={canvas} data={v}/>
-			{/if}
-		{/each}
-		{/key}
+		{#if canvasIsReady && showUI}
+			{#key [cameraChange, pointChange]}
+				{#each $uvars as v (v.id)}
+					{#if v.type === "vec2"}
+						<DraggablePoint canvas={canvas} data={v}/>
+					{/if}
+				{/each}
+			{/key}
 		{/if}
 	</div>
 
-	{#if canvasIsReady}
+	{#if canvasIsReady && showUI}
 		<CoordinateBox mouse={mousePos} fval={canvas.computeFval(mousePos)}/>
 	{/if}
 </main>

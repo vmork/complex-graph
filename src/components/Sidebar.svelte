@@ -14,22 +14,13 @@
 
     export let canvas: Canvas;
     export let collapsed = false;
+    export let editorText: string = "";
 
     let dispatch = createEventDispatcher();
 
-    $uvars = [
-        {id: uuidv4(), type: "slider", name: "x", value: 0, min: -10, max: 10, step: 0.01},
-        {id: uuidv4(), type: "point", name: "p", x: 0, y: 0, color: randomColorRGB()},
-    ];
-
-    $uvars.forEach(v => {
-        if (v.type === "slider") canvas.addUniform(v.name, v.value, "float");
-        else if (v.type === "point") canvas.addUniform(v.name, [v.x, v.y], "vec2");
-    });
-
     let tabs: Tab[] = [
         {name: "Main", id: 1},
-        {name: "Controls", id: 2},
+        {name: "Settings", id: 2},
     ]
     let activeTab = tabs[0];
     let tabTransitionDuration = 150;
@@ -38,26 +29,29 @@
         return $uvars.some(w => (w.id !== v.id) && (w.name === v.name));
     }
 
-    function addSlider() {
-        $uvars = [...$uvars, {id: uuidv4(), type: "slider", name: "", value: 0, min: -10, max: 10, step: 0.01}]
+    function addSlider(name="", value=0, min=-10, max=10, step=0.001) {
+        $uvars = [...$uvars, {id: uuidv4(), type: "float", name, value, min, max, step}];
+        if (name.trim()) canvas.addUniform(name, value, "float");
     }
-    function addPoint() {
-        $uvars = [...$uvars, {id: uuidv4(), type: "point", name: "", x: 0, y: 0, color: randomColorRGB()}]
+    function addPoint(name="", x=0, y=0, color=randomColorRGB()) {
+        $uvars = [...$uvars, {id: uuidv4(), type: "vec2", name, x, y, color}];
+        if (name.trim()) canvas.addUniform(name, [x, y], "vec2");
     }
 
     function deleteVariable(v: UserVariable) {
+        $uvars = $uvars.filter(uvar => uvar.id !== v.id);
         if (!duplicateName(v)) {
             canvas.deleteUniform(v.name);
-            canvas.recompilePrograms();
+            canvas.compileUserCodeToGlsl(editorText, true)
         }
-        $uvars = $uvars.filter(uvar => uvar.id !== v.id);
     }
 
     function variableValueChange(v: UserVariable) {
         $uvars = $uvars;
+        console.log("value change", $uvars)
         dispatch("variableChange", v);
         if (!v.name.trim()) return;    
-        canvas.setUniformValue(v.name, v.type === "slider" ? v.value : [v.x, v.y]);
+        canvas.setUniformValue(v.name, v.type === "float" ? v.value : [v.x, v.y]);
         canvas.render();
     }
 
@@ -72,10 +66,10 @@
             console.error("Duplicate name ", v.name);
         }
         else if (v.name.trim()) {
-            if (v.type === "slider") canvas.addUniform(v.name, v.value, "float");
-            else if (v.type === "point") canvas.addUniform(v.name, [v.x, v.y], "vec2");
+            if (v.type === "float") canvas.addUniform(v.name, v.value, "float");
+            else if (v.type === "vec2") canvas.addUniform(v.name, [v.x, v.y], "vec2");
         }
-        canvas.recompilePrograms(); 
+        canvas.compileUserCodeToGlsl(editorText, true);
     }
 
 </script>
@@ -96,25 +90,29 @@
             in:fly={{ x:-10, duration: tabTransitionDuration }} 
             out:fly={{ x:10, duration: tabTransitionDuration }}
             on:outrostart={makeAbsolute}>
-        <Editor canvas={canvas} text={canvas.userFunctionSrc}/>
-        <div id="variables-area">
-            {#each $uvars as v (v.id)}
-            <Variable 
-                data={v}
-                on:delete={(e) => deleteVariable(e.detail)}
-                on:nameChange={(e) => variableNameChange(e.detail)}
-                on:valueChange={(e) => variableValueChange(e.detail)}
-            />
-            {/each}
-            <div id="buttons">
-                <button class="add-slider-btn" on:click={addSlider}>
-                    <i class="bi bi-plus"></i>Add slider
-                </button>
-                <button class="add-slider-btn" on:click={addPoint}>
-                    <i class="bi bi-plus"></i>Add point
-                </button>
+
+            <div id="main-tab-inner">
+                <Editor canvas={canvas} bind:code={editorText}/>
+                
+                <div id="variables-area">
+                    {#each $uvars as v (v.id)}
+                    <Variable 
+                        data={v}
+                        on:delete={(e) => deleteVariable(e.detail)}
+                        on:nameChange={(e) => variableNameChange(e.detail)}
+                        on:valueChange={(e) => variableValueChange(e.detail)}
+                    />
+                    {/each}
+                </div>
+                <div id="buttons">
+                    <button class="add-slider-btn" on:click={(e) => addSlider()}>
+                        <i class="bi bi-plus"></i>Add slider
+                    </button>
+                    <button class="add-slider-btn" on:click={(e) => addPoint()}>
+                        <i class="bi bi-plus"></i>Add point
+                    </button>
+                </div>
             </div>
-        </div>
         </div>
 
         {:else if activeTab.id == 2}
@@ -138,16 +136,21 @@
         color: var(--c-light-grey);
     }
     #below-tab-area {
-        overflow-y: scroll;
-        &::-webkit-scrollbar {
-            display: none;
-        }
-        overflow-x: hidden;
         height: 100%;
         padding: 0;
     }
     #controls-tab {
         height: 100%;
+    }
+    #main-tab {
+        height: 100%;
+    }
+    #main-tab-inner {
+        overflow: scroll;
+        &::-webkit-scrollbar {
+            display: none;
+        }
+        height: calc(100% - 130px);
     }
     #buttons {
         display: flex;

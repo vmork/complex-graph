@@ -8,8 +8,8 @@ export const builtinVars: BuiltinVariableEnv = new Map(Object.entries({
     'pi': { type: DT.Real, value: Math.PI },
 }))
 
-type BuiltinFunctionInfo = { glslName: string, signatures: functionSignature[] }
-type BuiltinFunctionEnv = Map<string, BuiltinFunctionInfo>
+export type BuiltinFunctionInfo = { glslName?: string, signatures: functionSignature[] }
+export type BuiltinFunctionEnv = Map<string, BuiltinFunctionInfo>
 
 const sigs: { [key: string]: functionSignature[] } = {
     Re_Re_or_Re_Im:  [{out:DT.Real, in:[DT.Real]}, {out:DT.Real, in:[DT.Imag]}],
