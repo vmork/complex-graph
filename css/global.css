@@ -3,12 +3,18 @@ html, body {
     width: 100%;
     margin: 0;
     padding: 0;
-
-    font-family: 'Roboto', sans-serif;
 }
 
 * {
+    font-family: 'Fira Code';
+    font-weight: 400;
+    font-optical-sizing: auto;
     box-sizing: border-box;
+}
+
+*::selection {
+    background-color: #156da78b; /* Set the background color */
+    color: var(--c-white); /* Set the text color */
 }
 
 :root {
