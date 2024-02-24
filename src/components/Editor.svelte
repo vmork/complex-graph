@@ -13,6 +13,7 @@
     let currentExampleName = defaultWorkspaceName;
     const initText = code;
     let showExamples = false;
+    const tabsize = 4;
 
     function onSelectExample(name: string, example: WorkspaceData) {
         console.log("select", name, example)
@@ -33,13 +34,27 @@
         $compilationErrors.forEach(err => console.error(err.toString()))
     }
 
+    function insertTab() { // https://stackoverflow.com/a/52715915
+        let selection = window.getSelection();
+        let cursorPos = selection.getRangeAt(0).startOffset;
+        let focus = selection.focusNode;
+        let offset = selection.focusOffset;
+        // focus.textContent = code.slice(0, cursorPos) + " ".repeat(tabsize) + code.slice(cursorPos);
+
+        let range = document.createRange();
+        range.selectNode(focus);
+        range.setStart(focus, offset + tabsize);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+
+        code = preElem.innerText;
+    }
+
     function handleKeyDown(e) {
         if (e.key === "Tab") {
             e.preventDefault();
-            // let start = preElem.selectionStart;
-            // let end = preElem.selectionEnd;
-            // text = text.substring(0, start) + "    " + text.substring(end);
-            // preElem.selectionStart = preElem.selectionEnd = start + 4;
+            insertTab();
         }
     }
 </script>
@@ -110,7 +125,7 @@
 
     }
     #glsl-output {
-        margin-bottom: 20px;
+        margin-bottom: 10px;
     }
     #error-div {
         width: 100%;

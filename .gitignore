@@ -1,5 +1,7 @@
 src/compiler/dist/
 
+NOTES.md
+
 # Ignore node_modules directory
 node_modules/
 
