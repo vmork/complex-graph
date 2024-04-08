@@ -27,6 +27,7 @@ class Canvas {
         'gridSpacing': {type: 'float', value: 1.0},
         'showModContours': {type: 'bool', value: true},
         'showPhaseContours': {type: 'bool', value: false},
+        'polarCoords': {type: 'bool', value: false},
     }))
     settings: Settings = cloneMap(this.defaultSettings)
 
@@ -42,8 +43,14 @@ class Canvas {
     updateSetting(name: string, value: any, render=true) {
         if (!this.settings.has(name)) throw new Error(`setting ${name} doesnt exist`);
         this.settings.get(name).value = value;
-        this.mainProgram.setUniformValue(`u_${name}`, value);
+        if (this.mainProgram.uniforms.has(`u_${name}`)) {
+            this.mainProgram.setUniformValue(`u_${name}`, value);
+        }
         if (render) this.render();
+    }
+    getSetting(name: string) {
+        if (!this.settings.has(name)) throw new Error(`setting ${name} doesnt exist`);
+        return this.settings.get(name).value;
     }
 
     addUniform(name: string, value: UniformValue=null, type: UniformType="float") {
@@ -126,15 +133,13 @@ class Canvas {
         const gl = this.gl;		
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.useProgram(this.mainProgram.id);
-
+        
         this.mainProgram.setUniformValue("u_worldMat", this.camera.getWorldMatrix());
         this.mainProgram.setUniformValue("u_mouse", [this.mousePos.x, this.mousePos.y]);
         this.mainProgram.setUniformValue("u_resolution", [this.c.width, this.c.height]);
         this.mainProgram.setUniformValue("u_scale", [this.camera.scale.x, this.camera.scale.y]);
         this.mainProgram.bindAllUniforms();
-
-        // this.mainProgram.logUniforms();
-
+        
         gl.viewport(0, 0, this.c.width, this.c.height);
         gl.clearColor(0.42, 0.42, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -178,8 +183,8 @@ class Canvas {
 
         this.addUniformsFromWorkspace(this.defaultWorkspace);
 
-        await mainProgram.compileFromUrls("shaders/vertex.glsl", "shaders/fragment.glsl", this.userCodeGlsl);
-        await compProgram.compileFromUrls("shaders/vertex-comp.glsl", "shaders/fragment-comp.glsl", this.userCodeGlsl);
+        await mainProgram.compileFromUrls("shaders/main/vertex.glsl", "shaders/main/fragment.glsl", this.userCodeGlsl);
+        await compProgram.compileFromUrls("shaders/comp-fval/vertex.glsl", "shaders/comp-fval/fragment.glsl", this.userCodeGlsl);
 
         if (!(mainProgram && compProgram)) { return; }
         

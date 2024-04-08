@@ -8,6 +8,10 @@ export function roundToDigits(x: number, digits: number) {
     return Math.round(x*m)/m;
 }
 
+export function rectToPolar(x: number, y: number) {
+    return {r: Math.sqrt(x*x + y*y), theta: Math.atan2(y, x)};
+}
+
 export function randomColorRGB() {
     return `#${Math.floor(Math.random()*16777215).toString(16).padEnd(6, '0')}`;
 }

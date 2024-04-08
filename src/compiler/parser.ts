@@ -69,7 +69,6 @@ export class Parser {
     }
 
     statement(): ast.StmtNode {
-        // TODO: funcdef
         let stmt: ast.StmtNode;
         switch (this.peek().type) {
             case TT.IDENTIFIER: 

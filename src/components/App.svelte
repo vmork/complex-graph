@@ -130,7 +130,7 @@
 	</div>
 
 	{#if canvasIsReady && showUI}
-		<CoordinateBox mouse={mousePos} fval={canvas.computeFval(mousePos)}/>
+		<CoordinateBox canvas={canvas} mouse={mousePos} fval={canvas.computeFval(mousePos)}/>
 	{/if}
 </main>
 

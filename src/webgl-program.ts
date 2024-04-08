@@ -87,7 +87,7 @@ class ProgramManager {
 
         return this.compile(vertSrc, fragSrc, userFunction);
     }
-
+    
     private compile(vertSrc: string, fragSrc: string, userFunction: string) {
         const gl = this.gl;
 

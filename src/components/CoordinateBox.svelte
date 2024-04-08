@@ -1,12 +1,21 @@
 <script lang="ts">
     import type { Point } from "../types";
+    import { rectToPolar } from "../utils";
+    import { Canvas } from "../canvas";
 
     export let mouse: Point;
     export let fval: Point;
+    export let canvas: Canvas;
 
     function formatPoint(p: Point): string {
-        if (p.y < 0) return `${formatNum(p.x)} - ${formatNum(-p.y)}i`;
-        else         return `${formatNum(p.x)} + ${formatNum(p.y)}i`;
+        if (canvas.getSetting('polarCoords')) {
+            let {r, theta} = rectToPolar(p.x, p.y);
+            return `${formatNum(r)} ∠ ${formatNum(theta/Math.PI)} π`;
+        }
+        else {
+            if (p.y < 0) return `${formatNum(p.x)} - ${formatNum(-p.y)}i`;
+            else         return `${formatNum(p.x)} + ${formatNum(p.y)}i`;
+        }
     }
 
     function formatNum(x: number): string {

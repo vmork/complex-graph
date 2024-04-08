@@ -20,23 +20,28 @@
 <div id="container">
     <div class="setting">
         <span class="label">Grid on: </span>
-        <input type="checkbox" checked={getSettingValue('showGrid')}
+        <input type="checkbox" checked={canvas.getSetting('showGrid')}
             on:change={e => canvas.updateSetting('showGrid', e.target.checked)}/>
     </div>
     <div class="setting">
         <span class="label">Grid spacing: </span>
-        <input type="range" min="0.05" max="2.0" step="0.001" value={getSettingValue('gridSpacing')}
+        <input type="range" min="0.05" max="2.0" step="0.001" value={canvas.getSetting('gridSpacing')}
             on:input={e => canvas.updateSetting('gridSpacing', e.target.value)}/>
     </div>
     <div class="setting">
         <span class="label">Mod contours: </span>
-        <input type="checkbox" checked={getSettingValue('showModContours')}
+        <input type="checkbox" checked={canvas.getSetting('showModContours')}
             on:change={e => canvas.updateSetting('showModContours', e.target.checked)}/>
     </div>
     <div class="setting">
         <span class="label">Phase contours: </span>
-        <input type="checkbox" checked={getSettingValue('showPhaseContours')}
+        <input type="checkbox" checked={canvas.getSetting('showPhaseContours')}
             on:change={e => canvas.updateSetting('showPhaseContours', e.target.checked)}/>    
+    </div>
+    <div class="setting">
+        <span class="label">Polar form: </span>
+        <input type="checkbox" checked={canvas.getSetting('polarCoords')}
+            on:change={e => canvas.updateSetting('polarCoords', e.target.checked)}/>    
     </div>
     <div id="buttons">
         <button on:click={ () => canvas.camera.reset() }>Reset camera (h)</button>

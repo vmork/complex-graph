@@ -122,10 +122,10 @@
             border: 1px solid var(--c-red);
             border-inline: 0;
         }
-
     }
     #glsl-output {
         margin-bottom: 10px;
+        overflow-x: scroll;
     }
     #error-div {
         width: 100%;
