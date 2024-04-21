@@ -67,4 +67,4 @@ export const workspaceExamples: {[key: string]: WorkspaceData} = {
     },
 }
 
-export const defaultWorkspaceName = "juliaSetBurningShip2";
+export const defaultWorkspaceName = "identity";

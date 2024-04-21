@@ -18,6 +18,7 @@ class Canvas {
     compFbo: WebGLFramebuffer;
     mainProgram: ProgramManager;
     compProgram: ProgramManager;
+    shapeProgram: ProgramManager;
     userCodeGlsl: string;
     mousePos: Point = {x: 0, y: 0};
     defaultWorkspace: WorkspaceData;
@@ -129,8 +130,29 @@ class Canvas {
         return { x: pixel[0], y: pixel[1] };
     }
 
+    renderShapes() {
+        const gl = this.gl;
+
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        
+        gl.useProgram(this.shapeProgram.id);
+        this.shapeProgram.setUniformValue("u_worldMat", this.camera.getWorldMatrix());
+        this.shapeProgram.setUniformValue("u_resolution", [this.c.width, this.c.height]);
+        this.shapeProgram.setUniformValue("u_scale", [this.camera.scale.x, this.camera.scale.y]);
+        this.shapeProgram.bindAllUniforms();
+
+        gl.viewport(0, 0, this.c.width, this.c.height);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        gl.disable(gl.BLEND)
+    }
+
     render(once=true) {	
         const gl = this.gl;		
+        gl.viewport(0, 0, this.c.width, this.c.height);
+        gl.clearColor(0.42, 0.42, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+        
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.useProgram(this.mainProgram.id);
         
@@ -140,9 +162,9 @@ class Canvas {
         this.mainProgram.setUniformValue("u_scale", [this.camera.scale.x, this.camera.scale.y]);
         this.mainProgram.bindAllUniforms();
         
-        gl.viewport(0, 0, this.c.width, this.c.height);
-        gl.clearColor(0.42, 0.42, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
+        
+        this.renderShapes();
 
         if (!once) requestAnimationFrame(() => this.render(once));
     }
@@ -181,15 +203,23 @@ class Canvas {
         ])
         this.compProgram = compProgram
 
+        let shapeProgram = new ProgramManager(gl, [
+            new Uniform("u_worldMat", "mat3"),
+            new Uniform("u_resolution", "vec2"),
+            new Uniform("u_scale", "vec2"),
+        ]);
+        this.shapeProgram = shapeProgram
+
         this.addUniformsFromWorkspace(this.defaultWorkspace);
 
         await mainProgram.compileFromUrls("shaders/main/vertex.glsl", "shaders/main/fragment.glsl", this.userCodeGlsl);
         await compProgram.compileFromUrls("shaders/comp-fval/vertex.glsl", "shaders/comp-fval/fragment.glsl", this.userCodeGlsl);
+        await shapeProgram.compileFromUrls("shaders/shapes/vertex.glsl", "shaders/shapes/fragment.glsl", this.userCodeGlsl);
 
-        if (!(mainProgram && compProgram)) { return; }
+        if (!(mainProgram && compProgram && shapeProgram)) { return; }
         
-        const aPositionLocation = gl.getAttribLocation(mainProgram.id, "a_position");
-		utils.bufferFullscreenQuad(gl, aPositionLocation);
+		utils.bufferFullscreenQuad(gl, gl.getAttribLocation(mainProgram.id, "a_position"));
+		utils.bufferFullscreenQuad(gl, gl.getAttribLocation(shapeProgram.id, "a_position"));
 
         // setup framebuffer for computing and reading f(z) in computeFval
         let compFbo = gl.createFramebuffer();
