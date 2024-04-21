@@ -956,6 +956,10 @@ var app = (function () {
         else
             dispatch_dev('SvelteDOMSetAttribute', { node, attribute, value });
     }
+    function prop_dev(node, property, value) {
+        node[property] = value;
+        dispatch_dev('SvelteDOMSetProperty', { node, property, value });
+    }
     function set_data_dev(text, data) {
         data = '' + data;
         if (text.wholeText === data)
@@ -1355,6 +1359,9 @@ var app = (function () {
     function roundToDigits(x, digits) {
         const m = Math.pow(10, digits);
         return Math.round(x * m) / m;
+    }
+    function rectToPolar(x, y) {
+        return { r: Math.sqrt(x * x + y * y), theta: Math.atan2(y, x) };
     }
     function randomColorRGB() {
         return `#${Math.floor(Math.random() * 16777215).toString(16).padEnd(6, '0')}`;
@@ -1818,7 +1825,6 @@ var app = (function () {
             return { nodeType: NT.StmtList, statements: statements };
         }
         statement() {
-            // TODO: funcdef
             let stmt;
             switch (this.peek().type) {
                 case TT.IDENTIFIER:
@@ -2481,6 +2487,7 @@ var app = (function () {
                 'gridSpacing': { type: 'float', value: 1.0 },
                 'showModContours': { type: 'bool', value: true },
                 'showPhaseContours': { type: 'bool', value: false },
+                'polarCoords': { type: 'bool', value: false },
             }));
             this.settings = cloneMap(this.defaultSettings);
             this.c = canvas;
@@ -2493,9 +2500,16 @@ var app = (function () {
             if (!this.settings.has(name))
                 throw new Error(`setting ${name} doesnt exist`);
             this.settings.get(name).value = value;
-            this.mainProgram.setUniformValue(`u_${name}`, value);
+            if (this.mainProgram.uniforms.has(`u_${name}`)) {
+                this.mainProgram.setUniformValue(`u_${name}`, value);
+            }
             if (render)
                 this.render();
+        }
+        getSetting(name) {
+            if (!this.settings.has(name))
+                throw new Error(`setting ${name} doesnt exist`);
+            return this.settings.get(name).value;
         }
         addUniform(name, value = null, type = "float") {
             this.mainProgram.addUniform(new Uniform(name, type));
@@ -2567,20 +2581,34 @@ var app = (function () {
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             return { x: pixel[0], y: pixel[1] };
         }
+        renderShapes() {
+            const gl = this.gl;
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.useProgram(this.shapeProgram.id);
+            this.shapeProgram.setUniformValue("u_worldMat", this.camera.getWorldMatrix());
+            this.shapeProgram.setUniformValue("u_resolution", [this.c.width, this.c.height]);
+            this.shapeProgram.setUniformValue("u_scale", [this.camera.scale.x, this.camera.scale.y]);
+            this.shapeProgram.bindAllUniforms();
+            gl.viewport(0, 0, this.c.width, this.c.height);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            gl.disable(gl.BLEND);
+        }
         render(once = true) {
             const gl = this.gl;
+            gl.viewport(0, 0, this.c.width, this.c.height);
+            gl.clearColor(0.42, 0.42, 1, 1);
+            gl.clear(gl.COLOR_BUFFER_BIT);
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.useProgram(this.mainProgram.id);
             this.mainProgram.setUniformValue("u_worldMat", this.camera.getWorldMatrix());
             this.mainProgram.setUniformValue("u_mouse", [this.mousePos.x, this.mousePos.y]);
             this.mainProgram.setUniformValue("u_resolution", [this.c.width, this.c.height]);
             this.mainProgram.setUniformValue("u_scale", [this.camera.scale.x, this.camera.scale.y]);
+            console.log(this.camera.scale);
             this.mainProgram.bindAllUniforms();
-            // this.mainProgram.logUniforms();
-            gl.viewport(0, 0, this.c.width, this.c.height);
-            gl.clearColor(0.42, 0.42, 1, 1);
-            gl.clear(gl.COLOR_BUFFER_BIT);
             gl.drawArrays(gl.TRIANGLES, 0, 6);
+            this.renderShapes();
             if (!once)
                 requestAnimationFrame(() => this.render(once));
         }
@@ -2615,14 +2643,21 @@ var app = (function () {
                     new Uniform("u_point", "vec2"),
                 ]);
                 this.compProgram = compProgram;
+                let shapeProgram = new ProgramManager(gl, [
+                    new Uniform("u_worldMat", "mat3"),
+                    new Uniform("u_resolution", "vec2"),
+                    new Uniform("u_scale", "vec2"),
+                ]);
+                this.shapeProgram = shapeProgram;
                 this.addUniformsFromWorkspace(this.defaultWorkspace);
-                yield mainProgram.compileFromUrls("shaders/vertex.glsl", "shaders/fragment.glsl", this.userCodeGlsl);
-                yield compProgram.compileFromUrls("shaders/vertex-comp.glsl", "shaders/fragment-comp.glsl", this.userCodeGlsl);
-                if (!(mainProgram && compProgram)) {
+                yield mainProgram.compileFromUrls("shaders/main/vertex.glsl", "shaders/main/fragment.glsl", this.userCodeGlsl);
+                yield compProgram.compileFromUrls("shaders/comp-fval/vertex.glsl", "shaders/comp-fval/fragment.glsl", this.userCodeGlsl);
+                yield shapeProgram.compileFromUrls("shaders/shapes/vertex.glsl", "shaders/shapes/fragment.glsl", this.userCodeGlsl);
+                if (!(mainProgram && compProgram && shapeProgram)) {
                     return;
                 }
-                const aPositionLocation = gl.getAttribLocation(mainProgram.id, "a_position");
-                bufferFullscreenQuad(gl, aPositionLocation);
+                bufferFullscreenQuad(gl, gl.getAttribLocation(mainProgram.id, "a_position"));
+                bufferFullscreenQuad(gl, gl.getAttribLocation(shapeProgram.id, "a_position"));
                 // setup framebuffer for computing and reading f(z) in computeFval
                 let compFbo = gl.createFramebuffer();
                 gl.bindFramebuffer(gl.FRAMEBUFFER, compFbo);
@@ -2636,19 +2671,18 @@ var app = (function () {
     }
 
     /* src/components/CoordinateBox.svelte generated by Svelte v3.55.1 */
-
     const file$8 = "src/components/CoordinateBox.svelte";
 
     function create_fragment$8(ctx) {
     	let div;
     	let p0;
     	let t0;
-    	let t1_value = formatPoint(/*mouse*/ ctx[0]) + "";
+    	let t1_value = /*formatPoint*/ ctx[2](/*mouse*/ ctx[0]) + "";
     	let t1;
     	let t2;
     	let p1;
     	let t3;
-    	let t4_value = formatPoint(/*fval*/ ctx[1]) + "";
+    	let t4_value = /*formatPoint*/ ctx[2](/*fval*/ ctx[1]) + "";
     	let t4;
 
     	const block = {
@@ -2662,12 +2696,12 @@ var app = (function () {
     			t3 = text("f(z) = ");
     			t4 = text(t4_value);
     			attr_dev(p0, "class", "svelte-1qvof95");
-    			add_location(p0, file$8, 17, 4, 414);
+    			add_location(p0, file$8, 26, 4, 694);
     			attr_dev(p1, "class", "svelte-1qvof95");
-    			add_location(p1, file$8, 18, 4, 463);
+    			add_location(p1, file$8, 27, 4, 743);
     			attr_dev(div, "id", "coordinate-box");
     			attr_dev(div, "class", "svelte-1qvof95");
-    			add_location(div, file$8, 16, 0, 384);
+    			add_location(div, file$8, 25, 0, 664);
     		},
     		l: function claim(nodes) {
     			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
@@ -2683,8 +2717,8 @@ var app = (function () {
     			append_dev(p1, t4);
     		},
     		p: function update(ctx, [dirty]) {
-    			if (dirty & /*mouse*/ 1 && t1_value !== (t1_value = formatPoint(/*mouse*/ ctx[0]) + "")) set_data_dev(t1, t1_value);
-    			if (dirty & /*fval*/ 2 && t4_value !== (t4_value = formatPoint(/*fval*/ ctx[1]) + "")) set_data_dev(t4, t4_value);
+    			if (dirty & /*mouse*/ 1 && t1_value !== (t1_value = /*formatPoint*/ ctx[2](/*mouse*/ ctx[0]) + "")) set_data_dev(t1, t1_value);
+    			if (dirty & /*fval*/ 2 && t4_value !== (t4_value = /*formatPoint*/ ctx[2](/*fval*/ ctx[1]) + "")) set_data_dev(t4, t4_value);
     		},
     		i: noop,
     		o: noop,
@@ -2704,10 +2738,6 @@ var app = (function () {
     	return block;
     }
 
-    function formatPoint(p) {
-    	if (p.y < 0) return `${formatNum(p.x)} - ${formatNum(-p.y)}i`; else return `${formatNum(p.x)} + ${formatNum(p.y)}i`;
-    }
-
     function formatNum(x) {
     	if (Math.abs(x) < 0.001 || Math.abs(x) >= 1000) return x.toExponential(3); else return x.toFixed(3);
     }
@@ -2717,6 +2747,16 @@ var app = (function () {
     	validate_slots('CoordinateBox', slots, []);
     	let { mouse } = $$props;
     	let { fval } = $$props;
+    	let { canvas } = $$props;
+
+    	function formatPoint(p) {
+    		if (canvas.getSetting('polarCoords')) {
+    			let { r, theta } = rectToPolar(p.x, p.y);
+    			return `${formatNum(r)} ∠ ${formatNum(theta / Math.PI)} π`;
+    		} else {
+    			if (p.y < 0) return `${formatNum(p.x)} - ${formatNum(-p.y)}i`; else return `${formatNum(p.x)} + ${formatNum(p.y)}i`;
+    		}
+    	}
 
     	$$self.$$.on_mount.push(function () {
     		if (mouse === undefined && !('mouse' in $$props || $$self.$$.bound[$$self.$$.props['mouse']])) {
@@ -2726,9 +2766,13 @@ var app = (function () {
     		if (fval === undefined && !('fval' in $$props || $$self.$$.bound[$$self.$$.props['fval']])) {
     			console.warn("<CoordinateBox> was created without expected prop 'fval'");
     		}
+
+    		if (canvas === undefined && !('canvas' in $$props || $$self.$$.bound[$$self.$$.props['canvas']])) {
+    			console.warn("<CoordinateBox> was created without expected prop 'canvas'");
+    		}
     	});
 
-    	const writable_props = ['mouse', 'fval'];
+    	const writable_props = ['mouse', 'fval', 'canvas'];
 
     	Object.keys($$props).forEach(key => {
     		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<CoordinateBox> was created with unknown prop '${key}'`);
@@ -2737,26 +2781,35 @@ var app = (function () {
     	$$self.$$set = $$props => {
     		if ('mouse' in $$props) $$invalidate(0, mouse = $$props.mouse);
     		if ('fval' in $$props) $$invalidate(1, fval = $$props.fval);
+    		if ('canvas' in $$props) $$invalidate(3, canvas = $$props.canvas);
     	};
 
-    	$$self.$capture_state = () => ({ mouse, fval, formatPoint, formatNum });
+    	$$self.$capture_state = () => ({
+    		rectToPolar,
+    		mouse,
+    		fval,
+    		canvas,
+    		formatPoint,
+    		formatNum
+    	});
 
     	$$self.$inject_state = $$props => {
     		if ('mouse' in $$props) $$invalidate(0, mouse = $$props.mouse);
     		if ('fval' in $$props) $$invalidate(1, fval = $$props.fval);
+    		if ('canvas' in $$props) $$invalidate(3, canvas = $$props.canvas);
     	};
 
     	if ($$props && "$$inject" in $$props) {
     		$$self.$inject_state($$props.$$inject);
     	}
 
-    	return [mouse, fval];
+    	return [mouse, fval, formatPoint, canvas];
     }
 
     class CoordinateBox extends SvelteComponentDev {
     	constructor(options) {
     		super(options);
-    		init(this, options, instance$8, create_fragment$8, safe_not_equal, { mouse: 0, fval: 1 });
+    		init(this, options, instance$8, create_fragment$8, safe_not_equal, { mouse: 0, fval: 1, canvas: 3 });
 
     		dispatch_dev("SvelteRegisterComponent", {
     			component: this,
@@ -2779,6 +2832,14 @@ var app = (function () {
     	}
 
     	set fval(value) {
+    		throw new Error("<CoordinateBox>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	get canvas() {
+    		throw new Error("<CoordinateBox>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
+    	}
+
+    	set canvas(value) {
     		throw new Error("<CoordinateBox>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
     	}
     }
@@ -3049,7 +3110,7 @@ f(c) :=
             vars: [makeSlider("N", 100, 0, 100, 1), makeSlider("x", 2.0)]
         },
     };
-    const defaultWorkspaceName = "juliaSetBurningShip2";
+    const defaultWorkspaceName = "identity";
 
     function cubicOut(t) {
         const f = t - 1.0;
@@ -3121,7 +3182,7 @@ f(c) :=
     			}
 
     			attr_dev(div, "id", "examples-container");
-    			attr_dev(div, "class", "svelte-1m00x31");
+    			attr_dev(div, "class", "svelte-iy1tqz");
     			add_location(div, file$6, 57, 8, 2027);
     		},
     		m: function mount(target, anchor) {
@@ -3207,7 +3268,7 @@ f(c) :=
     		c: function create() {
     			button = element("button");
     			t = text(t_value);
-    			attr_dev(button, "class", "svelte-1m00x31");
+    			attr_dev(button, "class", "svelte-iy1tqz");
     			toggle_class(button, "selected", /*name*/ ctx[21] === /*currentExampleName*/ ctx[4]);
     			add_location(button, file$6, 59, 16, 2180);
     		},
@@ -3265,7 +3326,7 @@ f(c) :=
     			}
 
     			attr_dev(div, "id", "error-div");
-    			attr_dev(div, "class", "svelte-1m00x31");
+    			attr_dev(div, "class", "svelte-iy1tqz");
     			add_location(div, file$6, 73, 4, 2607);
     		},
     		m: function mount(target, anchor) {
@@ -3327,7 +3388,7 @@ f(c) :=
     		c: function create() {
     			p = element("p");
     			t = text(t_value);
-    			attr_dev(p, "class", "svelte-1m00x31");
+    			attr_dev(p, "class", "svelte-iy1tqz");
     			add_location(p, file$6, 75, 8, 2681);
     		},
     		m: function mount(target, anchor) {
@@ -3370,7 +3431,7 @@ f(c) :=
     			set_style(span, "color", `var(--c-white)`);
     			add_location(span, file$6, 81, 4, 2764);
     			attr_dev(pre, "id", "glsl-output");
-    			attr_dev(pre, "class", "svelte-1m00x31");
+    			attr_dev(pre, "class", "svelte-iy1tqz");
     			add_location(pre, file$6, 82, 4, 2828);
     		},
     		m: function mount(target, anchor) {
@@ -3444,23 +3505,23 @@ f(c) :=
     			t9 = space();
     			if (if_block2) if_block2.c();
     			if_block2_anchor = empty();
-    			attr_dev(button0, "class", "svelte-1m00x31");
+    			attr_dev(button0, "class", "svelte-iy1tqz");
     			toggle_class(button0, "selected", /*showGlslOutput*/ ctx[3]);
     			add_location(button0, file$6, 52, 4, 1680);
-    			attr_dev(button1, "class", "svelte-1m00x31");
+    			attr_dev(button1, "class", "svelte-iy1tqz");
     			add_location(button1, file$6, 53, 4, 1793);
-    			attr_dev(button2, "class", "svelte-1m00x31");
+    			attr_dev(button2, "class", "svelte-iy1tqz");
     			toggle_class(button2, "selected", /*showExamples*/ ctx[5]);
     			add_location(button2, file$6, 55, 8, 1890);
     			attr_dev(div0, "id", "tooltip-container");
-    			attr_dev(div0, "class", "svelte-1m00x31");
+    			attr_dev(div0, "class", "svelte-iy1tqz");
     			add_location(div0, file$6, 54, 4, 1853);
     			attr_dev(div1, "id", "buttons-div");
-    			attr_dev(div1, "class", "svelte-1m00x31");
+    			attr_dev(div1, "class", "svelte-iy1tqz");
     			add_location(div1, file$6, 51, 0, 1653);
     			attr_dev(pre, "id", "editor");
     			attr_dev(pre, "contenteditable", "true");
-    			attr_dev(pre, "class", "svelte-1m00x31");
+    			attr_dev(pre, "class", "svelte-iy1tqz");
     			toggle_class(pre, "error", /*$compilationErrors*/ ctx[6].length > 0);
     			add_location(pre, file$6, 67, 0, 2385);
     		},
@@ -5047,35 +5108,45 @@ f(c) :=
 
     // (14:0) {#key settings}
     function create_key_block$1(ctx) {
-    	let div5;
+    	let div6;
     	let div0;
     	let span0;
     	let t1;
     	let input0;
+    	let input0_checked_value;
     	let t2;
     	let div1;
     	let span1;
     	let t4;
     	let input1;
+    	let input1_value_value;
     	let t5;
     	let div2;
     	let span2;
     	let t7;
     	let input2;
+    	let input2_checked_value;
     	let t8;
     	let div3;
     	let span3;
     	let t10;
     	let input3;
+    	let input3_checked_value;
     	let t11;
     	let div4;
+    	let span4;
+    	let t13;
+    	let input4;
+    	let input4_checked_value;
+    	let t14;
+    	let div5;
     	let button;
     	let mounted;
     	let dispose;
 
     	const block = {
     		c: function create() {
-    			div5 = element("div");
+    			div6 = element("div");
     			div0 = element("div");
     			span0 = element("span");
     			span0.textContent = "Grid on:";
@@ -5101,92 +5172,132 @@ f(c) :=
     			input3 = element("input");
     			t11 = space();
     			div4 = element("div");
+    			span4 = element("span");
+    			span4.textContent = "Polar form:";
+    			t13 = space();
+    			input4 = element("input");
+    			t14 = space();
+    			div5 = element("div");
     			button = element("button");
     			button.textContent = "Reset camera (h)";
     			attr_dev(span0, "class", "label svelte-1jasimh");
     			add_location(span0, file$3, 16, 8, 425);
     			attr_dev(input0, "type", "checkbox");
-    			input0.checked = /*getSettingValue*/ ctx[2]('showGrid');
+    			input0.checked = input0_checked_value = /*canvas*/ ctx[0].getSetting('showGrid');
     			attr_dev(input0, "class", "svelte-1jasimh");
     			add_location(input0, file$3, 17, 8, 470);
     			attr_dev(div0, "class", "setting svelte-1jasimh");
     			add_location(div0, file$3, 15, 4, 395);
     			attr_dev(span1, "class", "label svelte-1jasimh");
-    			add_location(span1, file$3, 21, 8, 658);
+    			add_location(span1, file$3, 21, 8, 660);
     			attr_dev(input1, "type", "range");
     			attr_dev(input1, "min", "0.05");
     			attr_dev(input1, "max", "2.0");
     			attr_dev(input1, "step", "0.001");
-    			input1.value = /*getSettingValue*/ ctx[2]('gridSpacing');
+    			input1.value = input1_value_value = /*canvas*/ ctx[0].getSetting('gridSpacing');
     			attr_dev(input1, "class", "svelte-1jasimh");
-    			add_location(input1, file$3, 22, 8, 708);
+    			add_location(input1, file$3, 22, 8, 710);
     			attr_dev(div1, "class", "setting svelte-1jasimh");
-    			add_location(div1, file$3, 20, 4, 628);
+    			add_location(div1, file$3, 20, 4, 630);
     			attr_dev(span2, "class", "label svelte-1jasimh");
-    			add_location(span2, file$3, 26, 8, 928);
+    			add_location(span2, file$3, 26, 8, 932);
     			attr_dev(input2, "type", "checkbox");
-    			input2.checked = /*getSettingValue*/ ctx[2]('showModContours');
+    			input2.checked = input2_checked_value = /*canvas*/ ctx[0].getSetting('showModContours');
     			attr_dev(input2, "class", "svelte-1jasimh");
-    			add_location(input2, file$3, 27, 8, 978);
+    			add_location(input2, file$3, 27, 8, 982);
     			attr_dev(div2, "class", "setting svelte-1jasimh");
-    			add_location(div2, file$3, 25, 4, 898);
+    			add_location(div2, file$3, 25, 4, 902);
     			attr_dev(span3, "class", "label svelte-1jasimh");
-    			add_location(span3, file$3, 31, 8, 1180);
+    			add_location(span3, file$3, 31, 8, 1186);
     			attr_dev(input3, "type", "checkbox");
-    			input3.checked = /*getSettingValue*/ ctx[2]('showPhaseContours');
+    			input3.checked = input3_checked_value = /*canvas*/ ctx[0].getSetting('showPhaseContours');
     			attr_dev(input3, "class", "svelte-1jasimh");
-    			add_location(input3, file$3, 32, 8, 1232);
+    			add_location(input3, file$3, 32, 8, 1238);
     			attr_dev(div3, "class", "setting svelte-1jasimh");
-    			add_location(div3, file$3, 30, 4, 1150);
+    			add_location(div3, file$3, 30, 4, 1156);
+    			attr_dev(span4, "class", "label svelte-1jasimh");
+    			add_location(span4, file$3, 36, 8, 1450);
+    			attr_dev(input4, "type", "checkbox");
+    			input4.checked = input4_checked_value = /*canvas*/ ctx[0].getSetting('polarCoords');
+    			attr_dev(input4, "class", "svelte-1jasimh");
+    			add_location(input4, file$3, 37, 8, 1498);
+    			attr_dev(div4, "class", "setting svelte-1jasimh");
+    			add_location(div4, file$3, 35, 4, 1420);
     			attr_dev(button, "class", "svelte-1jasimh");
-    			add_location(button, file$3, 36, 8, 1439);
-    			attr_dev(div4, "id", "buttons");
-    			attr_dev(div4, "class", "svelte-1jasimh");
-    			add_location(div4, file$3, 35, 4, 1412);
-    			attr_dev(div5, "id", "container");
+    			add_location(button, file$3, 41, 8, 1695);
+    			attr_dev(div5, "id", "buttons");
     			attr_dev(div5, "class", "svelte-1jasimh");
-    			add_location(div5, file$3, 14, 0, 370);
+    			add_location(div5, file$3, 40, 4, 1668);
+    			attr_dev(div6, "id", "container");
+    			attr_dev(div6, "class", "svelte-1jasimh");
+    			add_location(div6, file$3, 14, 0, 370);
     		},
     		m: function mount(target, anchor) {
-    			insert_dev(target, div5, anchor);
-    			append_dev(div5, div0);
+    			insert_dev(target, div6, anchor);
+    			append_dev(div6, div0);
     			append_dev(div0, span0);
     			append_dev(div0, t1);
     			append_dev(div0, input0);
-    			append_dev(div5, t2);
-    			append_dev(div5, div1);
+    			append_dev(div6, t2);
+    			append_dev(div6, div1);
     			append_dev(div1, span1);
     			append_dev(div1, t4);
     			append_dev(div1, input1);
-    			append_dev(div5, t5);
-    			append_dev(div5, div2);
+    			append_dev(div6, t5);
+    			append_dev(div6, div2);
     			append_dev(div2, span2);
     			append_dev(div2, t7);
     			append_dev(div2, input2);
-    			append_dev(div5, t8);
-    			append_dev(div5, div3);
+    			append_dev(div6, t8);
+    			append_dev(div6, div3);
     			append_dev(div3, span3);
     			append_dev(div3, t10);
     			append_dev(div3, input3);
-    			append_dev(div5, t11);
-    			append_dev(div5, div4);
-    			append_dev(div4, button);
+    			append_dev(div6, t11);
+    			append_dev(div6, div4);
+    			append_dev(div4, span4);
+    			append_dev(div4, t13);
+    			append_dev(div4, input4);
+    			append_dev(div6, t14);
+    			append_dev(div6, div5);
+    			append_dev(div5, button);
 
     			if (!mounted) {
     				dispose = [
-    					listen_dev(input0, "change", /*change_handler*/ ctx[3], false, false, false),
-    					listen_dev(input1, "input", /*input_handler*/ ctx[4], false, false, false),
-    					listen_dev(input2, "change", /*change_handler_1*/ ctx[5], false, false, false),
-    					listen_dev(input3, "change", /*change_handler_2*/ ctx[6], false, false, false),
+    					listen_dev(input0, "change", /*change_handler*/ ctx[2], false, false, false),
+    					listen_dev(input1, "input", /*input_handler*/ ctx[3], false, false, false),
+    					listen_dev(input2, "change", /*change_handler_1*/ ctx[4], false, false, false),
+    					listen_dev(input3, "change", /*change_handler_2*/ ctx[5], false, false, false),
+    					listen_dev(input4, "change", /*change_handler_3*/ ctx[6], false, false, false),
     					listen_dev(button, "click", /*click_handler*/ ctx[7], false, false, false)
     				];
 
     				mounted = true;
     			}
     		},
-    		p: noop,
+    		p: function update(ctx, dirty) {
+    			if (dirty & /*canvas*/ 1 && input0_checked_value !== (input0_checked_value = /*canvas*/ ctx[0].getSetting('showGrid'))) {
+    				prop_dev(input0, "checked", input0_checked_value);
+    			}
+
+    			if (dirty & /*canvas*/ 1 && input1_value_value !== (input1_value_value = /*canvas*/ ctx[0].getSetting('gridSpacing'))) {
+    				prop_dev(input1, "value", input1_value_value);
+    			}
+
+    			if (dirty & /*canvas*/ 1 && input2_checked_value !== (input2_checked_value = /*canvas*/ ctx[0].getSetting('showModContours'))) {
+    				prop_dev(input2, "checked", input2_checked_value);
+    			}
+
+    			if (dirty & /*canvas*/ 1 && input3_checked_value !== (input3_checked_value = /*canvas*/ ctx[0].getSetting('showPhaseContours'))) {
+    				prop_dev(input3, "checked", input3_checked_value);
+    			}
+
+    			if (dirty & /*canvas*/ 1 && input4_checked_value !== (input4_checked_value = /*canvas*/ ctx[0].getSetting('polarCoords'))) {
+    				prop_dev(input4, "checked", input4_checked_value);
+    			}
+    		},
     		d: function destroy(detaching) {
-    			if (detaching) detach_dev(div5);
+    			if (detaching) detach_dev(div6);
     			mounted = false;
     			run_all(dispose);
     		}
@@ -5281,6 +5392,7 @@ f(c) :=
     	const input_handler = e => canvas.updateSetting('gridSpacing', e.target.value);
     	const change_handler_1 = e => canvas.updateSetting('showModContours', e.target.checked);
     	const change_handler_2 = e => canvas.updateSetting('showPhaseContours', e.target.checked);
+    	const change_handler_3 = e => canvas.updateSetting('polarCoords', e.target.checked);
     	const click_handler = () => canvas.camera.reset();
 
     	$$self.$$set = $$props => {
@@ -5306,11 +5418,11 @@ f(c) :=
     	return [
     		canvas,
     		settings,
-    		getSettingValue,
     		change_handler,
     		input_handler,
     		change_handler_1,
     		change_handler_2,
+    		change_handler_3,
     		click_handler
     	];
     }
@@ -7488,6 +7600,7 @@ f(c) :=
 
     	coordinatebox = new CoordinateBox({
     			props: {
+    				canvas: /*canvas*/ ctx[1],
     				mouse: /*mousePos*/ ctx[3],
     				fval: /*canvas*/ ctx[1].computeFval(/*mousePos*/ ctx[3])
     			},
@@ -7504,6 +7617,7 @@ f(c) :=
     		},
     		p: function update(ctx, dirty) {
     			const coordinatebox_changes = {};
+    			if (dirty & /*canvas*/ 2) coordinatebox_changes.canvas = /*canvas*/ ctx[1];
     			if (dirty & /*mousePos*/ 8) coordinatebox_changes.mouse = /*mousePos*/ ctx[3];
     			if (dirty & /*canvas, mousePos*/ 10) coordinatebox_changes.fval = /*canvas*/ ctx[1].computeFval(/*mousePos*/ ctx[3]);
     			coordinatebox.$set(coordinatebox_changes);

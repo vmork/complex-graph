@@ -42,7 +42,7 @@ vec3 domainColor(vec2 z) {
 
     return c * modContour * phaseContour;
 }
-
+    
 void main() {
     vec2 z = f(uv);
 
