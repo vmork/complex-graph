@@ -7,7 +7,8 @@ class glslShaderError extends Error {
         this.fileName = fileName;
     }
     toString() {
-        return `GLSL ERROR: ${this.message}`
+        let typeStr = this.shaderType == 35633 ? "vertex" : "fragment";
+        return `glsl error in ${this.fileName} (${typeStr}):\n${this.message}`
     }
 }
 
@@ -32,14 +33,15 @@ function resizeCanvasToDisplaySize(canvas: HTMLCanvasElement) {
 function bufferFullscreenQuad(gl: WebGL2RenderingContext, attribLocation: number) {
     let buffer = gl.createBuffer();
     let vao = gl.createVertexArray();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bindVertexArray(vao);
     gl.enableVertexAttribArray(attribLocation);
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     
     let data = [-1,-1,  1,-1,  -1,1,  -1,1,  1,-1,  1,1];
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(data), gl.STATIC_DRAW);
 
     gl.vertexAttribPointer(attribLocation, 2, gl.FLOAT, false, 0, 0);
+    return vao;
 }
 
 async function getShaderText(url: string) {

@@ -72,7 +72,6 @@ export class TypeChecker {
         let mainFunc = this.declaredFunctions.get(settings.mainFunctionName)
         if (!mainFunc) this.error(`Must declare a main function f(z)`);
         const requiredSignature = {in: [DT.Imag], out: DT.Imag} as functionSignature
-        console.log(mainFunc.signatures, [requiredSignature])
         if (!arrayEqual(mainFunc.signatures, [requiredSignature])) {
             this.error(`Main function must be of type Imag -> Imag`)
         }

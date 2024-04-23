@@ -16,6 +16,10 @@ export function randomColorRGB() {
     return `#${Math.floor(Math.random()*16777215).toString(16).padEnd(6, '0')}`;
 }
 
+export function RGBStringToVec3(s: string) {
+    return s.substring(1).match(/.{2}/g).map(x => parseInt(x, 16)/255);
+}
+
 export function addLineNums(src: string) {
     return src.split("\n").map((l, i) => `${i+1}: ${l}`).join("\n")
 }

@@ -62,6 +62,13 @@ export class Camera {
             this.origin.x,   this.origin.y, 1,
         ]
     }
+    getInverseWorldMatrix() {
+        return [
+            1/this.scale.x, 0,              0,
+            0,              1/this.scale.y, 0,
+            -this.origin.x/this.scale.x, -this.origin.y/this.scale.y, 1,
+        ]
+    }
 
     constructor(canvas: HTMLCanvasElement, options: Options = defaultOptions) {
         this.canvas = canvas; this.options = options;
