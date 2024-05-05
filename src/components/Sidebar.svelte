@@ -10,9 +10,10 @@
     import { Circle, Shape } from "../shapes";
     import ShapeUI from "./ShapeUI.svelte";
 
-    import { fly } from "svelte/transition";
+    import { fade, fly, slide } from "svelte/transition";
     import { v4 as uuidv4 } from "uuid";
     import { createEventDispatcher } from "svelte";
+    import Dropdown from "./Dropdown.svelte";
 
     export let canvas: Canvas;
     export let collapsed = false;
@@ -39,8 +40,12 @@
         $uvars = [...$uvars, { id: uuidv4(), type: "vec2", name, x, y, color }];
         if (name.trim()) canvas.addUniform(name, [x, y], "vec2");
     }
-    function addShape() {
-        $shapes = [...$shapes, new Circle(0, 0, 1, randomColorRGB(), false)];
+    function addShape(type: "circle" | "line" | "custom") {
+        let shape: Shape
+        if (type === "circle") shape = new Circle(0, 0, 1);
+        else if (type === "line") shape = new Circle(0, 0, 1);
+        else shape = new Circle(0, 0, 1);
+        $shapes = [...$shapes, shape];
         canvas.render();
     }
     function deleteShape(shape: Shape) {
@@ -58,7 +63,6 @@
 
     function variableValueChange(v: UserVariable) {
         $uvars = $uvars;
-        console.log("value change", $uvars);
         dispatch("variableChange", v);
         if (!v.name.trim()) return;
         canvas.setUniformValue(v.name, v.type === "float" ? v.value : [v.x, v.y]);
@@ -79,6 +83,11 @@
             else if (v.type === "vec2") canvas.addUniform(v.name, [v.x, v.y], "vec2");
         }
         canvas.compileUserCodeToGlsl(editorText, true);
+    }
+
+    function updateShapeTransform(e) {
+        canvas.shapeProgram.setUniformValue("u_t", (e.target as HTMLInputElement).value);
+        canvas.render();
     }
 </script>
 
@@ -102,20 +111,45 @@
                 <div id="main-tab-inner">
                     <Editor {canvas} bind:code={editorText} />
 
+                    <div id="buttons">
+                        <button class="add-object-btn" on:click={(e) => addSlider()}>
+                            <i class="bi bi-plus"></i>Slider
+                        </button>
+                        <button class="add-object-btn" on:click={(e) => addPoint()}>
+                            <i class="bi bi-plus"></i>Point
+                        </button>
+                        <Dropdown
+                            items={[
+                                { name: "Circle", onClick: () => addShape("circle") },
+                                { name: "Line", onClick: () => addShape("line") },
+                                { name: "Custom", onClick: () => addShape("custom") },
+                            ]}
+                        >
+                            <button slot="trigger" class="add-object-btn">
+                                <i class="bi bi-plus"></i>Shape
+                            </button>
+                        </Dropdown>
+                    </div>
+
                     <div id="variables-area">
-                        {#if $uvars?.length}<h3 style="margin: 0 0 4px 0; font-size: 1em; color: var(--c-white);">Variables</h3>
+                        {#if $uvars?.length}
+                            <h3 transition:slide style="margin: 0 0 4px 0; font-size: 1em; color: var(--c-white);">
+                                Variables
+                            </h3>
                             {#each $uvars as v (v.id)}
-                                <Variable
-                                    data={v}
-                                    on:delete={(e) => deleteVariable(e.detail)}
-                                    on:nameChange={(e) => variableNameChange(e.detail)}
-                                    on:valueChange={(e) => variableValueChange(e.detail)}
-                                />
+                                <div transition:slide={{duration: 150}}>
+                                    <Variable
+                                        data={v}
+                                        on:delete={(e) => deleteVariable(e.detail)}
+                                        on:nameChange={(e) => variableNameChange(e.detail)}
+                                        on:valueChange={(e) => variableValueChange(e.detail)}
+                                    />
+                                </div>
                             {/each}
                         {/if}
 
                         {#if $shapes?.length}
-                            <div class="shapes-header-row">
+                            <div class="shapes-header-row" transition:slide>
                                 <span>Shapes</span>
                                 <div class="slider-container">
                                     <span>Transform:</span>
@@ -127,29 +161,17 @@
                                         max={1}
                                         step={0.001}
                                         value={0.0}
-                                        on:input={(e) => {
-                                            canvas.shapeProgram.setUniformValue("u_t", e.target.value);
-                                            canvas.render();
-                                        }}
+                                        on:input={updateShapeTransform}
                                     />
                                     <span>1</span>
                                 </div>
                             </div>
                             {#each $shapes as shape (shape.id)}
-                                <ShapeUI {shape} {canvas} on:delete={(e) => deleteShape(e.detail)} />
+                                <div transition:slide>
+                                    <ShapeUI {shape} {canvas} on:delete={(e) => deleteShape(e.detail)} />
+                                </div>
                             {/each}
                         {/if}
-                    </div>
-                    <div id="buttons">
-                        <button class="add-slider-btn" on:click={(e) => addSlider()}>
-                            <i class="bi bi-plus"></i>Slider
-                        </button>
-                        <button class="add-slider-btn" on:click={(e) => addPoint()}>
-                            <i class="bi bi-plus"></i>Point
-                        </button>
-                        <button class="add-slider-btn" on:click={(e) => addShape()}>
-                            <i class="bi bi-plus"></i>Shape
-                        </button>
                     </div>
                 </div>
             </div>
@@ -191,6 +213,11 @@
     #buttons {
         display: flex;
         gap: 10px;
+        padding: 0 0 10px 0;
+        position: sticky;
+        top: 0;
+        background-color: var(--c-dark);
+        z-index: 5;
     }
     .shapes-header-row {
         margin-top: 12px;
@@ -205,41 +232,13 @@
             font-size: 0.8em;
             display: flex;
             gap: 5px;
+            max-width: 200px;
             input {
                 translate: 0 -1px;
             }
         }
     }
-    input[type="range"] {
-        -webkit-appearance: none;
-        appearance: none;
-        background: transparent;
-        cursor: pointer;
-        flex-grow: 1;
-        &::-webkit-slider-runnable-track {
-            background: var(--c-light-grey);
-            height: 5px;
-            border-radius: 3px;
-        }
-        &::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 15px;
-            height: 15px;
-            background: var(--c-primary);
-            border-radius: 50%;
-            margin-top: calc(-7.5px + 2.5px);
-            &:hover {
-                // background: #5fc545;
-                transform: scale(1.2);
-            }
-            transition:
-                background-color 0.2s,
-                transform 0.2s;
-        }
-    }
-    .add-slider-btn {
-        margin-top: 10px;
+    .add-object-btn {
         border: 1px solid var(--c-light-grey);
         padding: 5px;
         // background-color: var(--c-dark-grey);

@@ -71,11 +71,4 @@
   #point.dragging {
     transform: scale(1.2);
   }
-  #name-div {
-    background-color: green;
-    color: var(--c-white);
-    padding: 5px;
-    height: 30px;
-    border-radius: 5px;
-  }
 </style>

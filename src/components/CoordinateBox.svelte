@@ -38,6 +38,7 @@
     color: var(--c-light-grey);
     border-radius: 5px;
     box-shadow: 0 0 2px var(--c-dark-grey);
+    font-size: 14px;
 
     p {
       margin: 0;

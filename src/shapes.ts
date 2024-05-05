@@ -1,104 +1,79 @@
 import { Color, VariableID } from "./types";
 import { v4 as uuidv4 } from "uuid";
 import { randomColorRGB } from "./utils";
+import { ProgramManager } from "./webgl-program";
 
-function circleVertices(x: number, y: number, r: number) {
-    let points = [];
-    const N = 1000;
-    for (let i of Array(N).keys()) {
-        let t = (i * 2 * Math.PI) / N;
-        points.push(x + r * Math.cos(t));
-        points.push(y + r * Math.sin(t));
-    }
-    points = [...points, points[0], points[1]] // assumes were drawing using gl.LINE_STRIP
-    return new Float32Array(points);
+function circleVertices(x: number, y: number, r: number, N: number) {
+  let points = new Array(N);
+  for (let i = 0; i < N; i++) {
+    let t = (i * 2 * Math.PI) / N;
+    points.push(x + r * Math.cos(t), y + r * Math.sin(t));
+  }
+  // assume were drawing using gl.LINE_STRIP, so need to join last segment
+  points.push(points[0], points[1]);
+  return new Float32Array(points);
 }
 
-export class Shape {
-    id: VariableID;
-    vertices: Float32Array;
-    color: Color;
-
-    constructor(color: Color) {
-        this.id = uuidv4();
-        this.color = color ?? randomColorRGB();
+function diskVertices(x: number, y: number, r: number, N: number) {
+  // note: will generate less than N vertices
+  let points = [];
+  for (let i = 0; i < N; i++) {
+    const pointX = x + 2 * r * (Math.random() - 0.5);
+    const pointY = y + 2 * r * (Math.random() - 0.5);
+    const d2 = Math.pow(pointX - x, 2) + Math.pow(pointY - y, 2);
+    if (d2 < r * r) {
+      points.push(pointX, pointY);
     }
+  }
+  return new Float32Array(points);
+}
 
-    setVertices() {
-        throw new Error("setVertices not implemented");
-    }
+type LineStyle = "lines" | "points" | "filled";
+
+export abstract class Shape {
+  public readonly id: VariableID = uuidv4();
+  vertices: Float32Array;
+  constructor(
+    public color: Color = randomColorRGB(),
+    public numVerts: number = 5000,
+    public lineStyle: LineStyle = "lines",
+    public thickness: number = 3
+  ) {}
+
+  abstract setVertices(): void
 }
 
 export class Circle extends Shape {
-    filled: boolean;
-    x: number;
-    y: number;
-    r: number;
+  constructor(
+    public x: number,
+    public y: number,
+    public r: number,
+    color: Color = undefined,
+    numVerts = undefined,
+    lineStyle: LineStyle = "lines",
+    thickness: number = undefined
+  ) {
+    super(color, numVerts, lineStyle, thickness);
+    this.setVertices();
+  }
 
-    constructor(x: number, y: number, r: number, color: Color = null, filled: boolean = false) {
-        super(color);
-        this.x = x;
-        this.y = y;
-        this.r = r;
-        this.filled = filled;
-        this.setVertices();
-    }
-
-    setVertices() {
-        this.vertices = circleVertices(this.x, this.y, this.r);
-    }
+  setVertices() {
+    if (this.lineStyle === "filled") this.vertices = diskVertices(this.x, this.y, this.r, this.numVerts);
+    else this.vertices = circleVertices(this.x, this.y, this.r, this.numVerts);
+  }
 }
 
-// happens once
-
-// let pointsBuffer = gl.createBuffer();
-// let pointsVao = gl.createVertexArray();
-// gl.bindVertexArray(pointsVao);
-// gl.enableVertexAttribArray(positionLoc);
-// gl.bindBuffer(gl.ARRAY_BUFFER, pointsBuffer)
-// gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
-
-// type Shape = { data: Float32Array, col: number[], filled: boolean }
-
-// let shapes: Shape[] = [
-//     {data: circleVertices(0, 0, 0.7), col: [0, 0.0, 0.8], filled: true},
-//     {data: circleVertices(0.4, 0, 0.7), col: [0, 0.8, 0.0], filled: false},
-// ]
-
-// function circleVertices(x: number, y: number, r: number) {
-//     let points = []
-//     const N = 100
-//     for (let i of Array(N).keys()) {
-//         let t = i*2*Math.PI/N
-//         points.push(x + r*Math.cos(t));
-//         points.push(y + r*Math.sin(t))
-//     }
-//     return new Float32Array(points)
-// }
-
-// function drawShape(shape: Shape) {
-//     let {data, col, filled} = shape
-//     program.setUniformValue("u_col", col); program.bindAllUniforms()
-//     let method = gl.LINE_LOOP as number
-//     if (filled) {
-//         data = new Float32Array([0, 0, ...data, data[0], data[1]])
-//         method = gl.TRIANGLE_FAN;
-//     }
-//     gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW)
-//     gl.drawArrays(gl.POINTS, 0, data.length/2);
-// }
-
-// function render() {
-//     gl.viewport(0, 0, canvas.width, canvas.height)
-//     gl.clearColor(0.42, 0.42, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT);
-//     gl.useProgram(program.id);
-//     program.setUniformValue("u_col", [1.0, 0.5, 0.5]);
-//     program.bindAllUniforms();
-//     gl.bindVertexArray(quadVao);
-//     gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-//     gl.bindVertexArray(pointsVao);
-//     for (let shape of shapes) {
-//         drawShape(shape)
-//     }
-// }
+export class ParametricShape extends Shape {
+  constructor(
+    public program: ProgramManager,
+    color: Color = undefined,
+    numVerts = undefined,
+    thickness: number = undefined
+  ) {
+    super(color, numVerts, "lines", thickness);
+    this.setVertices();
+  }
+  setVertices() {
+      // this.vertices = 
+  }
+}

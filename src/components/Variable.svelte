@@ -11,6 +11,7 @@
   let dispatch = createEventDispatcher();
   let showEditUI = false;
   let prevName = data.name;
+  let nameInputElem: HTMLInputElement;
 
   let displayX, displayY;
   $: {
@@ -42,7 +43,6 @@
   }
 
   function onValueChange() {
-    console.log("value change", data);
     dispatch("valueChange", data);
     updateMinMax();
   }
@@ -53,6 +53,11 @@
       data.max = Math.max(data.max, data.value);
     }
   }
+
+  onMount(() =>  {
+    nameInputElem.focus();
+  })
+
 </script>
 
 <div
@@ -75,6 +80,7 @@
     <ResizableInput
       type="text"
       bind:value={data.name}
+      bind:inputElem={nameInputElem}
       on:input={onNameChange}
     />
 
@@ -147,7 +153,7 @@
       input[type="number"]
     ) {
     -webkit-appearance: none;
-    -moz-appearance: textfield;
+    -moz-appearance: textfield; // ignore the warning, dont add appearance: textfield
     margin: 0;
   }
 
@@ -214,11 +220,6 @@
   input {
     outline: none;
   }
-  #name-input {
-    max-width: 150px;
-    // translate: 0 -1px;
-  }
-  #name-input,
   #value-input {
     font-size: 1.2em;
     color: #eeeeeedb;

@@ -147,7 +147,7 @@ class ProgramManager {
             this.addUniform(u);
         }
     }
-    addUniform(u: Uniform) {
+    addUniform(u: Uniform) { // TODO: do we need to bind here aswell?
         if (this.uniforms.has(u.name)) {
             console.error(`Uniform ${u.name} already exists in program`);
             return;
@@ -157,8 +157,10 @@ class ProgramManager {
     deleteUniform(name: string) {
         this.uniforms.delete(name);
     }
-    setUniformValue(name: string, value: any) {
-        this.uniforms.get(name).value = value;
+    setUniformValue(name: string, value: any, bind=false) { // TODO: tried to bind here instead of at render time, but didnt work
+        const u = this.uniforms.get(name)
+        u.value = value;
+        if (bind) this.bindUniform(u)
     }
     getUniformValue(name: string) {
         return this.uniforms.get(name).value;
@@ -173,18 +175,22 @@ class ProgramManager {
         }
     }
 
-    bindAllUniforms() {
+    private bindUniform(u: Uniform) {
         const gl = this.gl;
+        if (u.type === "float") gl.uniform1f(u.loc, u.value);
+        else if (u.type === "vec2") gl.uniform2fv(u.loc, u.value);
+        else if (u.type === "vec3") gl.uniform3fv(u.loc, u.value);
+        else if (u.type === "vec4") gl.uniform4fv(u.loc, u.value);
+        else if (u.type === "int") gl.uniform1i(u.loc, u.value);
+        else if (u.type === "mat2") gl.uniformMatrix2fv(u.loc, false, u.value);
+        else if (u.type === "mat3") gl.uniformMatrix3fv(u.loc, false, u.value);
+        else if (u.type === "bool") gl.uniform1i(u.loc, u.value);
+        else console.error("Unsupported uniform type: " + u.type);
+    }
+
+    bindAllUniforms() {
         for (let u of this.uniforms.values()) {
-            if (u.type === "float") gl.uniform1f(u.loc, u.value);
-            else if (u.type === "vec2") gl.uniform2fv(u.loc, u.value);
-            else if (u.type === "vec3") gl.uniform3fv(u.loc, u.value);
-            else if (u.type === "vec4") gl.uniform4fv(u.loc, u.value);
-            else if (u.type === "int") gl.uniform1i(u.loc, u.value);
-            else if (u.type === "mat2") gl.uniformMatrix2fv(u.loc, false, u.value);
-            else if (u.type === "mat3") gl.uniformMatrix3fv(u.loc, false, u.value);
-            else if (u.type === "bool") gl.uniform1i(u.loc, u.value);
-            else console.error("Unsupported uniform type: " + u.type);
+            this.bindUniform(u)
         }
     }
 }

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Shape, Circle } from "../shapes";
+  import { Shape, Circle, ParametricShape } from "../shapes";
   import ResizableInput from "./ResizableInput.svelte";
   import { shapes } from "../stores";
   import { Canvas } from "../canvas";
@@ -33,43 +33,45 @@
       on:input={updateParam}
       style:background-color={shape.color}
     />
-    {#if shape instanceof Circle}
-      <div class="param">
-        <p>x:</p>
-        <ResizableInput
-          type="number"
-          step={0.1}
-          bind:value={shape.x}
-          on:input={updateParam}
-        />
-      </div>
-      <div class="param">
-        <p>y:</p>
-        <ResizableInput
-          type="number"
-          step={0.1}
-          bind:value={shape.y}
-          on:input={updateParam}
-        />
-      </div>
-      <div class="param">
-        <p>r:</p>
-        <ResizableInput
-          type="number"
-          step={0.1}
-          bind:value={shape.r}
-          on:input={updateParam}
-        />
-      </div>
-      <div class="param">
-        <p>filled:</p>
-        <input
-          type="checkbox"
-          bind:checked={shape.filled}
-          on:change={updateParam}>
-      </div>
 
+    {#if showEditUI}
+    <div class="edit-ui-container">
+      <div class="param">
+        <p>Number of vertices:</p>
+        <ResizableInput type="number" step={100} min={5} bind:value={shape.numVerts} on:input={updateParam} />
+      </div>
+      <div class="param">
+        <p>{shape.lineStyle === "lines" ? "Line width:" : "Point size:"}</p>
+        <ResizableInput type="number" step={1} min={1} max={50} bind:value={shape.thickness} on:input={updateParam} />
+      </div>
+      <div class="param">
+        <p>Draw style:</p>
+        <select bind:value={shape.lineStyle} on:change={updateParam}>
+          <option value="lines">Lines</option>
+          <option value="points">Points</option>
+          <option value="filled">Filled</option>
+        </select>
+      </div>
+    </div>
+    {:else}
+      {#if shape instanceof Circle}
+        <div class="param">
+          <p>x:</p>
+          <ResizableInput type="number" step={0.1} bind:value={shape.x} on:input={updateParam} />
+        </div>
+        <div class="param">
+          <p>y:</p>
+          <ResizableInput type="number" step={0.1} bind:value={shape.y} on:input={updateParam} />
+        </div>
+        <div class="param">
+          <p>r:</p>
+          <ResizableInput type="number" step={0.1} min={0} bind:value={shape.r} on:input={updateParam} />
+        </div>
+      {:else if Shape instanceof ParametricShape}
+        <div>Not supported</div>
+      {/if}
     {/if}
+
     <button id="settings-btn" on:click={() => (showEditUI = !showEditUI)}>
       <i class="bi bi-gear" class:active={showEditUI}></i>
     </button>
@@ -80,7 +82,6 @@
 </div>
 
 <style lang="scss">
-  
   #container {
     font-size: 0.9em;
     display: flex;
@@ -100,6 +101,19 @@
     display: flex;
     gap: 7px;
     align-items: center;
+  }
+  .edit-ui-container {
+    display: flex;
+    gap: 7px;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: 0.9em;
+    select {
+      margin-inline: 5px;
+      // appearance: none;
+      background-color: var(--c-dark);
+      color: var(--c-white);
+    }
   }
   .param {
     p {
@@ -135,10 +149,6 @@
     border: none;
   }
 
-  input[type="checkbox"] {
-    accent-color: var(--c-primary);
-  }
-  
   button {
     margin-left: 5px;
     padding: 5px 0 5px 5px;

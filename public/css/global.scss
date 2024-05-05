@@ -1,0 +1,55 @@
+html, body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+* {
+    font-family: 'Fira Code';
+    font-weight: 400;
+    font-optical-sizing: auto;
+    box-sizing: border-box;
+}
+
+*::selection {
+    background-color: #156da78b; /* Set the background color */
+    color: var(--c-white); /* Set the text color */
+}
+
+:root {
+    --c-dark: #121212;
+    --c-dark-grey: #1e1e1e;
+    --c-light-grey: #a7a7a7;
+    --c-primary: #40a965;
+    --c-white: #eeeeeedb;
+}
+
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+    flex-grow: 1;
+    &::-webkit-slider-runnable-track {
+        background: var(--c-light-grey);
+        height: 5px;
+        border-radius: 3px;
+    }
+    &::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 15px;
+        height: 15px;
+        background: var(--c-primary);
+        border-radius: 50%;
+        margin-top: calc(-7.5px + 2.5px);
+        &:hover {
+            // background: #5fc545;
+            transform: scale(1.2);
+        }
+        transition:
+            background-color 0.2s,
+            transform 0.2s;
+    }
+}

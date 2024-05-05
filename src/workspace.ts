@@ -1,8 +1,6 @@
-import { Point, UserPoint, UserSlider, UserVariable, VariableType } from "./types";
+import { UserPoint, UserSlider, UserVariable } from "./types";
 import { v4 as uuidv4 } from 'uuid';
 import { randomColorRGB } from "./utils";
-import { Canvas } from "./canvas";
-import { uvars } from "./stores";
 import { Circle, Shape } from "./shapes";
 
 const codes = {

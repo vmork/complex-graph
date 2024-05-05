@@ -38,7 +38,6 @@
   }
 
   onMount(async () => {
-    console.log("App.svelte ran");
 
     split = Split(["#sidebar-div", "#canvas-div"], {
       sizes: lastSplitSizes,
@@ -169,7 +168,7 @@
   }
   #sidebar-div {
     height: 100%;
-    background-color: rgb(43, 43, 91);
+    background-color: var(--c-dark);
   }
   #canvas-div {
     flex-grow: 1;
