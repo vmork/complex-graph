@@ -253,7 +253,7 @@ class Canvas {
     gl.drawArrays(method, 0, shape.vertices.length / 2);
   }
 
-  private doRender(once = true) {
+  render() {
     const gl = this.gl;
     gl.viewport(0, 0, this.c.width, this.c.height);
     gl.clearColor(0.42, 0.42, 1, 1);
@@ -274,12 +274,6 @@ class Canvas {
     for (let shape of get(shapes)) {
       this.renderShape(shape);
     }
-
-    if (!once) requestAnimationFrame(() => this.doRender(once));
-  }
-
-  render() { // not sure if this has any effect really
-    requestAnimationFrame(() => this.doRender(true))
   }
 }
 
