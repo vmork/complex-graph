@@ -1,8 +1,7 @@
 <script lang="ts">
   import type { Canvas } from "../canvas";
-  import type { UserPoint, Point } from "../types";
   import { uvars } from "../stores";
-  import { roundToDigits } from "../utils";
+  import type { UserPoint } from "../types";
 
   export let canvas: Canvas;
   export let data: UserPoint;

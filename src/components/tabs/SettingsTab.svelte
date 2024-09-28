@@ -1,9 +1,8 @@
 <script lang="ts">
-  // @ts-nocheck
-  import type { Canvas } from "../canvas";
-
+  import type { Canvas } from "../../canvas";
+  
   export let canvas: Canvas;
-
+  
   let settings = canvas.settings;
 </script>
 
@@ -33,8 +32,7 @@
       <input
         type="checkbox"
         checked={canvas.getSetting("showModContours")}
-        on:change={(e) =>
-          canvas.updateSetting("showModContours", e.target.checked)}
+        on:change={(e) => canvas.updateSetting("showModContours", e.target.checked)}
       />
     </div>
     <div class="setting">
@@ -42,8 +40,7 @@
       <input
         type="checkbox"
         checked={canvas.getSetting("showPhaseContours")}
-        on:change={(e) =>
-          canvas.updateSetting("showPhaseContours", e.target.checked)}
+        on:change={(e) => canvas.updateSetting("showPhaseContours", e.target.checked)}
       />
     </div>
     <div class="setting">
@@ -54,6 +51,7 @@
         on:change={(e) => canvas.updateSetting("polarCoords", e.target.checked)}
       />
     </div>
+
     <div id="buttons">
       <button on:click={() => canvas.camera.reset()}>Reset camera (h)</button>
     </div>

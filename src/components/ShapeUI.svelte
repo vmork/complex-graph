@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Shape, Circle, ParametricShape } from "../shapes";
-  import ResizableInput from "./ResizableInput.svelte";
+  import ResizableInput from "./ui/ResizableInput.svelte";
   import { shapes } from "../stores";
   import { Canvas } from "../canvas";
 

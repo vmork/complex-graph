@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { fade, slide } from "svelte/transition";
-    import { onFocusOut } from "../utils";
+    import { fade } from "svelte/transition";
+    import { onFocusOut } from "../../utils";
 
     type DropdownItem = { name: string; onClick: () => void };
     export let items: DropdownItem[] = [];

@@ -51,9 +51,11 @@ float Sqrt(float x) { return sqrt(x); }
 
 vec2 Sin(vec2 z) { return vec2(sin(z.x)*cosh(z.y), cos(z.x)*sinh(z.y)); }
 float Sin(float x) { return sin(x); }
+vec3 Sin(vec3 z) { return sin(z); }
 
 vec2 Cos(vec2 z) { return vec2(cos(z.x)*cosh(z.y), -sin(z.x)*sinh(z.y)); }
 float Cos(float x) { return cos(x); }
+vec3 Cos(vec3 z) { return cos(z); }
 
 vec2 Tan(vec2 z) { return Div(Sin(z), Cos(z)); }
 float Tan(float x) { return tan(x); }

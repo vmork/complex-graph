@@ -2,10 +2,10 @@ import type { Point } from "./types";
 import { Camera } from "./camera";
 import * as utils from "./webgl-utils";
 import { ProgramManager, Uniform, UniformType, UniformValue } from "./webgl-program";
-import { compile } from "./compiler/main";
+import { CompilationContext, compile } from "./compiler/main";
 import { uvars, shapes, compilationErrors } from "./stores";
 import { get } from "svelte/store";
-import { WorkspaceData } from "./workspace";
+import { WorkspaceData, workspaceExamples, WorkspaceName as WorkspaceName } from "./workspace";
 import { RGBStringToVec3, cloneMap } from "./utils";
 import { Circle, Shape } from "./shapes";
 
@@ -20,6 +20,8 @@ class Canvas {
   compProgram: ProgramManager;
   shapeProgram: ProgramManager;
   userCodeGlsl: string;
+  coloringFunctionGlsl: string
+  coloringFuncSrc: string
   mousePos: Point = { x: 0, y: 0 };
   defaultWorkspace: WorkspaceData;
   quadVao: WebGLVertexArrayObject;
@@ -43,7 +45,8 @@ class Canvas {
     this.defaultWorkspace = workspace;
     uvars.set(workspace.vars ?? []);
     shapes.set(workspace.shapes ?? []);
-    this.compileUserCodeToGlsl(workspace.code, false);
+    this.compileUserCode(workspace.code, false);
+    this.compileColoringFunction(workspace.coloringFunc, false)
   }
 
   async init(error: (s: string) => any) {
@@ -91,14 +94,19 @@ class Canvas {
 
     this.addUniformsFromWorkspace(this.defaultWorkspace);
 
-    await mainProgram.compileFromUrls("shaders/main/vertex.glsl", "shaders/main/fragment.glsl", this.userCodeGlsl);
+    await mainProgram.compileFromUrls(
+      "shaders/main/vertex.glsl", "shaders/main/fragment.glsl", 
+      this.userCodeGlsl, this.coloringFunctionGlsl)
+
     await compProgram.compileFromUrls(
-      "shaders/comp-fval/vertex.glsl",
-      "shaders/comp-fval/fragment.glsl",
-      this.userCodeGlsl
+      "shaders/comp-fval/vertex.glsl", "shaders/comp-fval/fragment.glsl",
+      this.userCodeGlsl, this.coloringFunctionGlsl
     );
-    console.log(this.userCodeGlsl);
-    await shapeProgram.compileFromUrls("shaders/shapes/vertex.glsl", "shaders/shapes/fragment.glsl", this.userCodeGlsl);
+
+    await shapeProgram.compileFromUrls(
+      "shaders/shapes/vertex.glsl", "shaders/shapes/fragment.glsl", 
+      this.userCodeGlsl, this.coloringFunctionGlsl)
+
     if (!(mainProgram && compProgram && shapeProgram)) {
       return;
     }
@@ -154,20 +162,22 @@ class Canvas {
     });
   }
 
-  loadNewWorkSpace(workspace: WorkspaceData) {
+  loadNewWorkSpace(wsName: WorkspaceName) {
+    const workspace = workspaceExamples[wsName];
     get(uvars).forEach((v) => this.deleteUniform(v.name));
     uvars.set(workspace.vars);
     shapes.set(workspace.shapes);
     this.addUniformsFromWorkspace(workspace);
-    this.compileUserCodeToGlsl(workspace.code, true);
+    this.compileUserCode(workspace.code, true);
+    this.compileColoringFunction(workspace.coloringFunc)
   }
 
   recompilePrograms() {
-    console.log(this.mainProgram.uniforms);
+    // console.log(this.mainProgram.uniforms);
     try {
-      this.mainProgram.recompile(this.userCodeGlsl);
-      this.compProgram.recompile(this.userCodeGlsl);
-      this.shapeProgram.recompile(this.userCodeGlsl);
+      this.mainProgram.recompile(this.userCodeGlsl, this.coloringFunctionGlsl);
+      this.compProgram.recompile(this.userCodeGlsl, this.coloringFunctionGlsl);
+      this.shapeProgram.recompile(this.userCodeGlsl, this.coloringFunctionGlsl);
     } catch (e) {
       compilationErrors.set([e]);
       return;
@@ -176,16 +186,36 @@ class Canvas {
     this.render();
   }
 
-  compileUserCodeToGlsl(src: string, recompileProgramsAfter = true) {
+  compileAndSetErrors(src: string, compilationContext: CompilationContext) {
     const uvarsSimple = new Map(get(uvars).map((x) => [x.name, x.type]));
-    const cOut = compile(src, uvarsSimple);
+    const cOut = compile(src, uvarsSimple, false, compilationContext);
     if (cOut.errors.length > 0) {
       compilationErrors.set(cOut.errors);
     } else {
       compilationErrors.set([]);
+    }
+    return cOut;
+  }
+
+  compileUserCode(src: string, recompileProgramsAfter = true) {
+    const cOut = this.compileAndSetErrors(src, "mainFunc");
+    if (cOut.errors.length === 0) {
       this.userCodeGlsl = cOut.glslString;
       if (recompileProgramsAfter) this.recompilePrograms(); // should always happen except on init
     }
+    return cOut;
+  }
+
+  compileColoringFunction(src: string, recompileProgramsAfter = true) {
+    const cOut = this.compileAndSetErrors(src, "coloring");
+    this.coloringFuncSrc = src;
+    
+    if (cOut.errors.length === 0) {
+      this.coloringFunctionGlsl = cOut.glslString;
+      if (recompileProgramsAfter) this.recompilePrograms();
+    }
+    console.log("coloring: ", this.coloringFunctionGlsl)
+    return cOut;
   }
 
   computeFval(p: Point): Point {

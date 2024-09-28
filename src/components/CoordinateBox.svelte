@@ -1,7 +1,7 @@
 <script lang="ts">
+  import { Canvas } from "../canvas";
   import type { Point } from "../types";
   import { rectToPolar } from "../utils";
-  import { Canvas } from "../canvas";
 
   export let mouse: Point;
   export let fval: Point;
@@ -30,14 +30,16 @@
 
 <style lang="scss">
   #coordinate-box {
+    border: 1px solid var(--c-light-grey);
+    border-left: none;
+    border-bottom: none;
     position: absolute;
     bottom: 0;
     left: 0;
     padding: 10px;
     background-color: var(--c-dark-grey);
     color: var(--c-light-grey);
-    border-radius: 5px;
-    box-shadow: 0 0 2px var(--c-dark-grey);
+    box-shadow: 0 10px 10px var(--c-dark-grey);
     font-size: 14px;
 
     p {

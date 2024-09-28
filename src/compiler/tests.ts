@@ -1,12 +1,12 @@
-import { compile } from "./main"
+import { CompilationContext, compile } from "./main"
 import chalk  from "chalk";
 import { treeAsJson } from "./utils";
 
 const LS = "-".repeat(20)
 const LS2 = "-".repeat(20)
 
-function runSnippet(id: string, src: string, skipTypeCheck=false, logAst=false, logTokens=false) {
-    let cOut = compile(src, new Map(), skipTypeCheck) 
+function runSnippet(id: string, src: string, skipTypeCheck=false, logAst=false, logTokens=false, context: CompilationContext="testing",) {
+    let cOut = compile(src, new Map(), skipTypeCheck, context) 
     let outStr = cOut.errors.length > 0 ? cOut.errors[0].toString() : cOut.glslString
 
     if (logAst) console.log(treeAsJson(cOut.astTree))
@@ -24,11 +24,11 @@ function runSnippet(id: string, src: string, skipTypeCheck=false, logAst=false, 
     return passed
 }
 
-function runAllSnippets(snippets: { [id: string]: string }, skipTypeCheck=false, logAst=false) {
+function runAllSnippets(snippets: { [id: string]: string }, skipTypeCheck=false, logAst=false, context: CompilationContext = "mainFunc") {
     const ids = Object.keys(snippets);
     let failedIds = [];
     ids.forEach(id => {
-        let passed = runSnippet(id, snippets[id], skipTypeCheck, logAst)
+        let passed = runSnippet(id, snippets[id], skipTypeCheck, logAst, false, context)
         if (!passed) failedIds.push(id)
     })
     console.log(`Passed ${ids.length-failedIds.length}/${ids.length} tests`)
@@ -59,10 +59,10 @@ if true:
         if true: break
     break`,
 
-if1: `if true: x = 1`,
-if2: `if true: x = 1; else: x = 2`,
-if3: `if true: x = 1; elif false: x = 2`,
-if4: `if true: x = 1; elif false: x = 2; else: x = 3`,
+if1: `if true: x := 1`,
+if2: `if true: x := 1; else: x := 2`,
+if3: `if true: x := 1; elif false: x := 2`,
+if4: `if true: x := 1; elif false: x := 2; else: x := 3`,
 if5: `if true:\n\tx = 1\n\ty = 2`,
 badIf1: `if true: `,
 
@@ -151,9 +151,20 @@ funcCall4: `x := cos(i); a := x*2sin(x)^2`,
 
 badFuncCall1: `x := g(1)`,
 badFuncCall2: `x := sin(true)`,
-badFuncCall3: `f(x, y) := x y; z := f(i, 1 < 2)`
+badFuncCall3: `f(x, y) := x y; z := f(i, 1 < 2)`,
+
+// color1: `x := color(1, 0, 0)`,
+// color2: `x := color(0.5)`,
+// badColor1: `x := color()`,
+// badColor2: `x := color(1, 2)`,
+// badColor3: `x := color(1, 2, 3, 4)`,
+
+// builtinVar1: `x := pi + e`,
 }
     
 // runSnippet('for2', parsingSnippets['for2'], true, false, true)
-runAllSnippets(parsingSnippets, true);
+// runAllSnippets(parsingSnippets, true);
 // runAllSnippets(typecheckSnippets, false, false)
+
+runAllSnippets(typecheckSnippets, false, false, "testing")
+// runSnippet("funcCall3", parsingSnippets["funcCall2"], true, false, false, "testing")

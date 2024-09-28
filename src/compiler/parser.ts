@@ -37,7 +37,7 @@ export class Parser {
         this.cur -= 1;
     }
 
-    advance() { // assumes were not at the end
+    advance() {
         if (this.isAtEnd()) return EOF;
         return this.tokens[this.cur++]; 
     }

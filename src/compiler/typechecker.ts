@@ -1,5 +1,5 @@
 import * as ast from "./ast-nodes"
-import { DT } from "./types";
+import { DT, signatureString } from "./types";
 import { builtinVars, builtinFuncs, BuiltinFunctionInfo } from "./builtins";
 import { TypeErr } from "./error";
 import { functionSignature } from "./types";
@@ -67,13 +67,22 @@ export class TypeChecker {
         this.assertType(types, [DT.Bool], msg);
     }
 
-    typecheckTree() {
+    typecheckTree(
+        requireMainFunc = true, 
+        mainFuncName = settings.mainFunctionName, 
+        mainFuncSignature = settings.mainFunctionSignature) {
+
         this.typecheck(this.tree)
-        let mainFunc = this.declaredFunctions.get(settings.mainFunctionName)
-        if (!mainFunc) this.error(`Must declare a main function f(z)`);
-        const requiredSignature = {in: [DT.Imag], out: DT.Imag} as functionSignature
-        if (!arrayEqual(mainFunc.signatures, [requiredSignature])) {
-            this.error(`Main function must be of type Imag -> Imag`)
+        
+        if (requireMainFunc) {
+            let mainFunc = this.declaredFunctions.get(mainFuncName)
+            if (!mainFunc) {
+                this.error(`Must declare a main function ${mainFuncName}`)
+            }
+            if (!mainFunc || !arrayEqual(mainFunc.signatures, [mainFuncSignature])) {
+                this.error(`Main function ${mainFuncName} must be of type ${signatureString(mainFuncSignature)}, 
+                            not ${signatureString(mainFunc.signatures[0])}`)
+            }
         }
     }
 
@@ -115,7 +124,7 @@ export class TypeChecker {
     assignment(node: ast.Assignment) {
         if (builtinVars.has(node.name)) this.error(`Cannot reassign builtin variable ${node.name}`);
         let v = this.lookupVar(node.name);
-        if (!v) this.error(`Cannot assign to undeclared variable ${node.name}`);
+        if (!v) this.error(`Cannot assign to undeclared variable ${node.name} (use := for declaration)`);
 
         const rhsType = this.typecheck(node.value);
         if (v.type !== rhsType) {
@@ -157,7 +166,7 @@ export class TypeChecker {
         });
 
         const returnType = this.currentFunction.returnType; // should be set when typechecking body and encountering return
-        if (!returnType) this.error(`Function ${node.name} doesnt return a value`)
+        if (!returnType) this.error(`Function ${node.name} doesn't return a value`)
         const signature = {in: inputTypes, out: returnType} as functionSignature;
         this.declaredFunctions.set(node.name, { signatures: [signature] });
 
@@ -183,12 +192,21 @@ export class TypeChecker {
         const {left, right, op} = node;
         const leftType = this.typecheck(left), rightType = this.typecheck(right);
         if (["+", "-", "*", "/", "^"].includes(op.lexeme)) {
-            this.assertNumeric([leftType, rightType], `Wrong operand types for ${op.lexeme}: ${DT[leftType]}, ${DT[rightType]}`);
+            if (leftType === DT.Color) {
+                this.assertType([rightType], [DT.Real, DT.Color], `Wrong operand types for '${op.lexeme}': ${DT[leftType]}, ${DT[rightType]}`)
+                return DT.Color
+            }
+            if (rightType === DT.Color) {
+                this.assertType([leftType], [DT.Real, DT.Color], `Wrong operand types for '${op.lexeme}': ${DT[leftType]}, ${DT[rightType]}`)
+                return DT.Color
+            }
+
+            this.assertNumeric([leftType, rightType], `Wrong operand types for '${op.lexeme}': ${DT[leftType]}, ${DT[rightType]}`);
             if (leftType === DT.Real && rightType === DT.Real) return DT.Real;
             return DT.Imag;
         }
         if (["<", ">", "<=", ">="].includes(op.lexeme)) {
-            this.assertType([leftType, rightType], [DT.Real], `Wrong operand types for ${op.lexeme}: ${DT[leftType]}, ${DT[rightType]}`);
+            this.assertType([leftType, rightType], [DT.Real], `Wrong operand types for '${op.lexeme}': ${DT[leftType]}, ${DT[rightType]}`);
             return DT.Bool;
         }
     }
@@ -219,11 +237,15 @@ export class TypeChecker {
         if (f) node.callee.name = f.glslName;
         else f = this.declaredFunctions.get(name)
         if (!f) this.error(`Undeclared function ${name}`);
-        
+
         const inputTypes = node.args.map(expr => this.typecheck(expr));
         for (let sig of f.signatures) {
             if (arrayEqual(sig.in, inputTypes)) return sig.out;
         }
-        this.error(`Wrong argument types for ${name}: [${inputTypes.map(t => DT[t]).join(', ')}]`)
+        
+        console.log("expected: ", name, f.signatures.map(s => [s.in.map(k => DT[k]), DT[s.out]]))
+
+        this.error(`Wrong argument types for ${name}: got (${inputTypes.map(t => DT[t]).join(', ')}), 
+                    expected (${f.signatures[0].in.map(s => DT[s])})`)
     }
 }

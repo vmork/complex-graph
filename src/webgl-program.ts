@@ -38,8 +38,12 @@ function insert(src: string, keyword: string, replacement: string) {
     return src.replace(re, `//#${keyword}\n${replacement}`);
 }
 
-function insertUserFunction(src: string, userFunction: string) {
-    return insert(src, "UFUNC", userFunction);
+function insertUserFunction(src: string, userFunctionSrc: string) {
+    return insert(src, "UFUNC", userFunctionSrc);
+}
+
+function insertColoringFunction(src: string, colorFunctionSrc: string) {
+    return insert(src, "UCOLOR", colorFunctionSrc)
 }
 
 function insertUniforms(src: string, uniforms: Iterable<Uniform>) {
@@ -83,7 +87,7 @@ class ProgramManager {
         return shader;
     }
 
-    async compileFromUrls(vertUrl: string, fragUrl: string, userFunction: string) {
+    async compileFromUrls(vertUrl: string, fragUrl: string, userFunction: string, coloringFunction: string) {
         this.vertUrl = vertUrl;
         this.fragUrl = fragUrl;
         let vertSrc = await utils.getShaderText(vertUrl);
@@ -94,7 +98,7 @@ class ProgramManager {
         this.fragSrcRaw = fragSrc;
 
         try {
-            return this.compile(vertSrc, fragSrc, userFunction);
+            return this.compile(vertSrc, fragSrc, userFunction, coloringFunction);
         } catch (e) {
             if (e instanceof utils.ShaderError) {
                 throw new Error(e.toString());
@@ -102,12 +106,14 @@ class ProgramManager {
         }
     }
 
-    private compile(vertSrc: string, fragSrc: string, userFunction: string) {
+    private compile(vertSrc: string, fragSrc: string, userFunction: string, coloringFunction: string) {
         const gl = this.gl;
 
         vertSrc = insertUserFunction(vertSrc, userFunction);
+        vertSrc = insertColoringFunction(vertSrc, coloringFunction)
         vertSrc = insertUniforms(vertSrc, this.uniforms.values());
         fragSrc = insertUserFunction(fragSrc, userFunction);
+        fragSrc = insertColoringFunction(fragSrc, coloringFunction)
         fragSrc = insertUniforms(fragSrc, this.uniforms.values());
 
         // console.log(addLineNums(fragSrc));
@@ -131,7 +137,7 @@ class ProgramManager {
         return this.id;
     }
 
-    recompile(userFunction: string) {
+    recompile(userFunction: string, coloringFunction: string) {
         const gl = this.gl;
         if (this.isCompiled) {
             gl.detachShader(this.id, this.vertShader);
@@ -139,7 +145,7 @@ class ProgramManager {
             gl.detachShader(this.id, this.fragShader);
             gl.deleteShader(this.fragShader);
         }
-        this.compile(this.vertSrcRaw, this.fragSrcRaw, userFunction);
+        this.compile(this.vertSrcRaw, this.fragSrcRaw, userFunction, coloringFunction);
     }
 
     addUniforms(uniforms: Iterable<Uniform>) {

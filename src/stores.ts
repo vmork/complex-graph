@@ -4,7 +4,6 @@ import { CompileError } from './compiler/error';
 import { writable } from 'svelte/store'
 import { Shape } from './shapes';
 
-
 type CompilationError = glslShaderError | CompileError;
 
 export const compilationErrors = writable<CompilationError[]>([])

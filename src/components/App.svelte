@@ -1,20 +1,18 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { Canvas } from "../canvas";
+  import { compilationErrors, uvars } from "../stores";
   import type { Point } from "../types";
+  import { resizeCanvasToDisplaySize } from "../webgl-utils";
   import CoordinateBox from "./CoordinateBox.svelte";
   import Sidebar from "./Sidebar.svelte";
-  import { getShaderText } from "../webgl-utils";
-  import { compilationErrors, uvars } from "../stores";
-  import { resizeCanvasToDisplaySize } from "../webgl-utils";
 
   import Split from "split.js";
-  import DraggablePoint from "./DraggablePoint.svelte";
   import {
-    WorkspaceData,
-    workspaceExamples,
     defaultWorkspaceName,
+    workspaceExamples
   } from "../workspace";
+  import DraggablePoint from "./DraggablePoint.svelte";
 
   let canvas: Canvas;
   let canvasIsReady: boolean = false;
@@ -119,7 +117,7 @@
     {#if canvasIsReady}
       <Sidebar
         {canvas}
-        editorText={workspace.code}
+        editorText={workspace.code.trim()}
         bind:collapsed={sidebarCollapsed}
         on:variableChange={(e) => {
           if (e.detail.type === "vec2") pointChange = !pointChange;

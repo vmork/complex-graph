@@ -1,10 +1,8 @@
 <script lang="ts">
-  import { createEventDispatcher } from "svelte";
-  import { onMount } from "svelte";
-  import { scale, fade } from "svelte/transition";
-  import type { UserVariable, UserSlider } from "../types";
-  import ResizableInput from "./ResizableInput.svelte";
+  import { createEventDispatcher, onMount } from "svelte";
+  import type { UserVariable } from "../types";
   import { roundToDigits } from "../utils";
+  import ResizableInput from "./ui/ResizableInput.svelte";
 
   export let data: UserVariable;
 

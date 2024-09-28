@@ -2,6 +2,7 @@ import * as ast from "./ast-nodes";
 import { DT } from "./types";
 import { allCombinations } from "./utils";
 import { typeToGlslType } from "./types";
+import { builtinVars } from "./builtins";
 
 const TAB_STR = " ".repeat(4);
 
@@ -60,7 +61,7 @@ export class Transformer {
             case ast.NT.Literal:
                 return this.literal(node);
             case ast.NT.Variable:
-                return node.name;
+                return this.variable(node)
             case ast.NT.FuncCall:
                 return this.funcCall(node);
 
@@ -179,7 +180,16 @@ export class Transformer {
         return `${node.op.lexeme}${this.transform(node.expr)}`;
     }
 
+    variable(node: ast.Variable) {
+        if (builtinVars.has(node.name)) {
+            return builtinVars.get(node.name).value
+        }
+        return node.name
+    }
+
     funcCall(node: ast.FunctionCall) {
+        // console.log(node)
+        
         const argStrs = node.args.map((x) => this.transform(x));
         return `${node.callee.name}(${argStrs.join(", ")})`;
     }
@@ -193,6 +203,8 @@ export class Transformer {
                 return this._number(value as number);
             case DT.Imag:
                 return `vec2(0.0, ${this._number(value as number)})`;
+            case DT.Color: 
+                throw new Error("literal color makes no sense")
             default:
                 const _exhaustiveCheck: never = type;
         }

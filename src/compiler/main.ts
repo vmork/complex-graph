@@ -6,13 +6,17 @@ import { treeAsJson } from "./utils";
 import { CompileError, SyntaxErr } from "./error";
 import * as ast from "./ast-nodes";
 import { Token } from "./token";
-import { glslType, glslTypeToDT } from "./types";
+import { DT, functionSignature, glslType, glslTypeToDT } from "./types";
 
 export { VariableEnv };
 
 export const settings = {
     maxFunctionParams: 5,
     mainFunctionName: "f",
+    mainFunctionSignature: {in: [DT.Imag], out: DT.Imag} as functionSignature,
+
+    coloringFunctionName: "col",
+    coloringFunctionSignature: {in: [DT.Imag], out: DT.Color} as functionSignature
 };
 
 export type compilerOutput = {
@@ -22,13 +26,21 @@ export type compilerOutput = {
     errors: CompileError[];
 };
 
-export function compile(src: string, userVariables: Map<string, glslType>, skipTypeCheck = false): compilerOutput {
+export type CompilationContext = "mainFunc" | "coloring" | "testing"
+
+export function compile(
+    src: string, 
+    userVariables: Map<string, glslType>, 
+    skipTypeCheck = false, 
+    context: CompilationContext = "mainFunc"): compilerOutput {
+
     let tokens: Token[],
         astTree: ast.Node,
         glslString: string,
         errors: CompileError[] = [];
 
     try {
+
         let scanner = new Scanner(src);
         tokens = scanner.scan();
 
@@ -39,11 +51,23 @@ export function compile(src: string, userVariables: Map<string, glslType>, skipT
         for (const [name, type] of userVariables.entries()) {
             varEnv.set(name, { type: glslTypeToDT.get(type) });
         }
-        let typechecker = new TypeChecker(astTree, varEnv);
-        if (!skipTypeCheck) typechecker.typecheckTree();
+
+        if (!skipTypeCheck) {
+            let typechecker = new TypeChecker(astTree, varEnv);
+            if (context === "mainFunc") {
+                typechecker.typecheckTree(true, settings.mainFunctionName, settings.mainFunctionSignature)
+            }
+            else if (context === "coloring") {
+                typechecker.typecheckTree(true, settings.coloringFunctionName, settings.coloringFunctionSignature)
+            }
+            else if (context === "testing") {
+                typechecker.typecheckTree(false)
+            }
+        }
 
         let transformer = new Transformer(astTree);
         glslString = transformer.transform();
+
     } catch (err) {
         if (err instanceof CompileError) {
             errors.push(err);
